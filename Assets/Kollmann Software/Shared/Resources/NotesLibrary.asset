@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-8567022712601421425
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01dc9a4fad87a0e459780940f165e0aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Creator: Stefan Andersson
+  Description: '1. Create 3D array
+
+    2. Create mesh based on 3D array
+
+    3.
+    Check for collision with 3D array
+
+    4. If hit node, create new object for
+    node, impart velocity from colliding object and remove it from original array
+
+    5.
+    Repeat'
+  CreateTime: 3/16/2021 11:39:02 AM
+  SaveSelectedObject: 1
+  SaveSceneCamera: 1
+  IsResolved: 0
+  IsReplying: 0
+  HasReplyingChanged: 0
+  SceneCameraPosition: {x: 0.3321085, y: 2.3895435, z: -2.004836}
+  SceneCameraRotation: {x: -0.109180026, y: 0.83159447, z: -0.17621349, w: -0.51524717}
+  SceneCameraOrthographic: 0
+  SceneCameraSize: 7.6745167
+  SceneCameraIs2dMode: 0
+  Category: {fileID: 7394451220972549871}
+  Comments: []
+  selectedObjectGUID: 1bfc947f-71fc-448a-b304-3e7d0e22fac5
+  selectedObjectIsAsset: 0
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841e7b49342f847409cc012450df369f, type: 3}
+  m_Name: NotesLibrary
+  m_EditorClassIdentifier: 
+  Notes:
+  - {fileID: -8567022712601421425}
+  Categories:
+  - {fileID: 7394451220972549871}
+  ShowSelection: 0
+  VisbilitySelection: 0
+  SelectedCategory: {fileID: 0}
+  searchString: 
+--- !u!114 &7394451220972549871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 90053af2b8dd80c4cb88ea90f4d1a45c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Name: Comment
+  color: {r: 1, g: 1, b: 1, a: 1}
