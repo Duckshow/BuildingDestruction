@@ -6,9 +6,12 @@ public class DestructibleObject : MonoBehaviour
 {
 
     [SerializeField, Min(1)] private Vector3Int size;
+	[SerializeField, Min(0.001f)] private float scale;
+    [SerializeField] private Material material;
 
-    private bool[][][] voxels;
-	private MeshFilter meshFilter;
+    //private bool[][][] voxels;
+    private bool[][][] v;
+    private MeshFilter meshFilter;
 
     private void Awake() {
 		meshFilter = GetComponent<MeshFilter>();
@@ -16,148 +19,195 @@ public class DestructibleObject : MonoBehaviour
 
     void Start()
     {
-        voxels = new bool[size.x][][];
-        for (int x = 0; x < size.x; x++)
-        {
-            voxels[x] = new bool[size.y][];
+        //voxels = new bool[size.x][][];
+        //for(int x = 0; x < size.x; x++) {
+        //    voxels[x] = new bool[size.y][];
 
-            for (int y = 0; y < size.y; y++)
-            {
-                voxels[x][y] = new bool[size.z];
+        //    for(int y = 0; y < size.y; y++) {
+        //        voxels[x][y] = new bool[size.z];
+        //    }
+        //}
+
+        v = new bool[size.x][][];
+        for(int x = 0; x < size.x; x++) {
+            v[x] = new bool[size.y][];
+
+            for(int y = 0; y < size.y; y++) {
+                v[x][y] = new bool[size.z];
             }
         }
 
-		CreateMesh();
+        CreateMesh();
     }
 
-    void Update()
-    {
-        
+    private void Update() {
+        if(meshFilter.mesh != null) {
+            for(int i = 0; i < meshFilter.mesh.vertices.Length; i++) {
+				Vector3 v = meshFilter.mesh.vertices[i];
+
+                Debug.DrawLine(v + Vector3.left * 0.1f, v + Vector3.forward * 0.1f, Color.red, 0.05f);
+				Debug.DrawLine(v + Vector3.forward * 0.1f, v + Vector3.right * 0.1f, Color.red, 0.05f);
+				Debug.DrawLine(v + Vector3.right * 0.1f, v + Vector3.back * 0.1f, Color.red, 0.05f);
+				Debug.DrawLine(v + Vector3.back * 0.1f, v + Vector3.left * 0.1f, Color.red, 0.05f);
+
+				Debug.DrawLine(v + Vector3.left * 0.1f, v + Vector3.up * 0.1f, Color.red, 0.05f);
+				Debug.DrawLine(v + Vector3.up * 0.1f, v + Vector3.right * 0.1f, Color.red, 0.05f);
+				Debug.DrawLine(v + Vector3.right * 0.1f, v + Vector3.down * 0.1f, Color.red, 0.05f);
+				Debug.DrawLine(v + Vector3.down * 0.1f, v + Vector3.left * 0.1f, Color.red, 0.05f);
+
+				Debug.DrawLine(v + Vector3.forward * 0.1f, v + Vector3.up * 0.1f, Color.red, 0.05f);
+				Debug.DrawLine(v + Vector3.up * 0.1f, v + Vector3.back * 0.1f, Color.red, 0.05f);
+				Debug.DrawLine(v + Vector3.back * 0.1f, v + Vector3.down * 0.1f, Color.red, 0.05f);
+				Debug.DrawLine(v + Vector3.down * 0.1f, v + Vector3.forward * 0.1f, Color.red, 0.05f);
+			}
+		}
     }
 
     private void CreateMesh() {
 
-		List<Vector3Int> exteriorVoxels = new List<Vector3Int>();
-        int x = 0, y = 0, z = 0;
+        //List<Vector3> vertices = new List<Vector3>();
+        //List<Vector3> normals = new List<Vector3>();
+        Vector3 normal;
 
-        for(x = 0; x < size.x; x++) {
-			for(y = 0; y < size.y; y++) {
-				for(z = 0; z < size.z; z++) {
-                    if(IsVoxelOnExterior(x, y, z, voxels)) {
-						exteriorVoxels.Add(new Vector3Int(x, y, z));
+        //int x = 0, y = 0, z = 0;
+
+
+
+        //for(z = 0; z < size.z; z++) {
+        //	for(y = 0; y < size.y; y++) {
+        //		for(x = 0; x < size.x; x++) {
+        //			if(IsVoxelOnExterior(x, y, z, voxels, out normal)) {
+        //				vertices.Add(transform.position + new Vector3(x * scale, y * scale, z * scale));
+        //				normals.Add(normal);
+        //			}
+        //		}
+        //	}
+        //}
+
+
+
+        //Mesh mesh = new Mesh();
+        //mesh.vertices = vertices.ToArray();
+        //mesh.normals = normals.ToArray();
+        //meshFilter.mesh = mesh;
+
+
+
+
+
+
+        //Set the mode used to create the mesh.
+        //Cubes is faster and creates less verts, tetrahedrons is slower and creates more verts but better represents the mesh surface.
+        //Marching marching = new MarchingCubes();
+        Marching marching = new MarchingTertrahedron();
+
+        //Surface is the value that represents the surface of mesh
+        //For example the perlin noise has a range of -1 to 1 so the mid point is where we want the surface to cut through.
+        //The target value does not have to be the mid point it can be any value with in the range.
+        marching.Surface = 0f;
+
+        //Fill voxels with values. Im using perlin noise but any method to create voxels will work.
+        float[] voxels = new float[size.x * size.y * size.z];
+        for(int z = 0; z < size.z; z++) {
+            for(int y = 0; y < size.y; y++) {
+                for(int x = 0; x < size.x; x++) {
+                    if(IsVoxelOnExterior(x, y, z, v, out normal) || x > size.x / 2 && y > size.y / 2) {
+                        voxels[x + y * size.x + z * size.y * size.z] = 0f;// (Random.value - 0.5f) * 2f;
                     }
-				}
-			}
-		}
+                    else {
+                        voxels[x + y * size.x + z * size.y * size.z] = 1f;// (Random.value - 0.5f) * 2f;
+                    }
 
-		meshFilter.mesh = MeshFromPolygon(exteriorVoxels);
+                    if(x > 5 && x < 10 && y > 5 && y < 10 && z > 5 && z < 10) {
+                        voxels[x + y * size.x + z * size.y * size.z] = 1f;
+                    }
+                    else {
+                        voxels[x + y * size.x + z * size.y * size.z] = 0f;
+                    }
+                }
+            }
+        }
+        
+        List<Vector3> verts = new List<Vector3>();
+        List<int> indices = new List<int>();
+
+        //The mesh produced is not optimal. There is one vert for each index.
+        //Would need to weld vertices for better quality mesh.
+        marching.Generate(voxels, size.x, size.y, size.z, verts, indices);
+
+        //A mesh in unity can only be made up of 65000 verts.
+        //Need to split the verts between multiple meshes.
+
+        int maxVertsPerMesh = 30000; //must be divisible by 3, ie 3 verts == 1 triangle
+        int numMeshes = verts.Count / maxVertsPerMesh + 1;
+
+        for(int i = 0; i < numMeshes; i++) {
+
+            List<Vector3> splitVerts = new List<Vector3>();
+            List<int> splitIndices = new List<int>();
+
+            for(int j = 0; j < maxVertsPerMesh; j++) {
+                int idx = i * maxVertsPerMesh + j;
+
+                if(idx < verts.Count) {
+                    splitVerts.Add(verts[idx]);
+                    splitIndices.Add(j);
+                }
+            }
+
+            if(splitVerts.Count == 0)
+                continue;
+
+            Mesh mesh = new Mesh();
+            mesh.SetVertices(splitVerts);
+            mesh.SetTriangles(splitIndices, 0);
+            mesh.RecalculateBounds();
+            mesh.RecalculateNormals();
+
+            GameObject go = new GameObject("Mesh");
+            go.transform.parent = transform;
+            go.AddComponent<MeshFilter>();
+            go.AddComponent<MeshRenderer>();
+            go.GetComponent<Renderer>().material = material;
+            go.GetComponent<MeshFilter>().mesh = mesh;
+            go.transform.localPosition = new Vector3(-size.x / 2, -size.y / 2, -size.z / 2);
+            
+            //meshes.Add(go);
+        }
     }
 
-	private static bool IsVoxelOnExterior(int x, int y, int z, bool[][][] voxels) {
-        if(x == 0) {
+	private static bool IsVoxelOnExterior(int x, int y, int z, bool[][][] voxels, out Vector3 normal) {
+        if(x == 1) {// || !voxels[x - 1][y][z]) {
+			normal = Vector3.left;
 			return true;
         }
 
-        if(y == 0) {
+        if(y == 1) {// || !voxels[x][y - 1][z]) {
+			normal = Vector3.down;
 			return true;
         }
 
-        if(z == 0) {
+        if(z == 1) {// || !voxels[x][y][z - 1]) {
+			normal = Vector3.back;
 			return true;
         }
 
-		if(x == voxels.Length - 1) {
+		if(x == voxels.Length - 2) {//|| !voxels[x + 1][y][z]) {
+			normal = Vector3.right;
 			return true;
 		}
 
-		if(y == voxels[x].Length - 1) {
+		if(y == voxels[x].Length - 2) {//|| !voxels[x][y + 1][z]) {
+			normal = Vector3.up;
 			return true;
 		}
 
-		if(z == voxels[x][y].Length - 1) {
+		if(z == voxels[x][y].Length - 2) {//|| !voxels[x][y][z + 1]) {
+			normal = Vector3.forward;
 			return true;
 		}
 
-        if(!voxels[x + 1][y][z]) {
-			return true;
-        }
-
-		if(!voxels[x - 1][y][z]) {
-			return true;
-		}
-
-		if(!voxels[x][y + 1][z]) {
-			return true;
-		}
-
-		if(!voxels[x][y - 1][z]) {
-			return true;
-		}
-
-		if(!voxels[x][y][z + 1]) {
-			return true;
-		}
-		
-		if(!voxels[x][y][z - 1]) {
-			return true;
-		}
-
+		normal = Vector3.zero;
 		return false;
-	}
-
-	private static Mesh MeshFromPolygon(List<Vector3Int> polygon) {
-		var count = polygon.Count;
-		// TODO: cache these things to avoid garbage
-		var verts = new Vector3[count];
-		var norms = new Vector3[count];
-		var tris = new int[count * 3];
-		// TODO: add UVs
-
-		var vi = 0;
-		var ni = 0;
-		var ti = 0;
-
-		// Top
-		for(int i = 0; i < count; i++) {
-			verts[vi++] = new Vector3(polygon[i].x, polygon[i].y, polygon[i].z);
-			norms[ni++] = Vector3.forward;
-		}
-
-        for(int vert = 0; vert < count - 2; vert++) {
-            tris[ti++] = vert;
-            tris[ti++] = vert + 1;
-            tris[ti++] = vert + 2;
-        }
-
-        //for(int vert = 2; vert < count; vert++) {
-        //	tris[ti++] = count;
-        //	tris[ti++] = count + vert;
-        //	tris[ti++] = count + vert - 1;
-        //}
-
-        //for(int vert = 0; vert < count; vert++) {
-        //	var si = 2 * count + 4 * vert;
-
-        //	tris[ti++] = si;
-        //	tris[ti++] = si + 1;
-        //	tris[ti++] = si + 2;
-
-        //	tris[ti++] = si;
-        //	tris[ti++] = si + 2;
-        //	tris[ti++] = si + 3;
-        //}
-
-        Debug.Assert(ti == tris.Length);
-		Debug.Assert(vi == verts.Length);
-		Debug.Log(ti + ", " + tris.Length);
-
-		var mesh = new Mesh();
-
-
-		mesh.vertices = verts;
-		mesh.triangles = tris;
-		mesh.normals = norms;
-
-		return mesh;
 	}
 }
