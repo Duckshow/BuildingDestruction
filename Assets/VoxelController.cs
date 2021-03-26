@@ -5,17 +5,22 @@ using UnityEngine;
 public class VoxelController : MonoBehaviour {
 
 	public class Voxel {
-		public int X;
-		public int Y;
-		public int Z;
+		public int Index;
 		public bool IsFilled;
 		public Color Color;
-		public bool HasBeenTouchedByBucketFill;
 
-		public Voxel(int x, int y, int z, bool isFilled) {
-			X = x;
-			Y = y;
-			Z = z;
+		public bool HasBeenTouchedByBucketFill;
+		public bool HasNeighborUp;
+		public bool HasNeighborDown;
+		public bool HasNeighborLeft;
+		public bool HasNeighborRight;
+		public bool HasNeighborFore;
+		public bool HasNeighborBack;
+
+
+
+		public Voxel(int i, bool isFilled) {
+			Index = i;
 			IsFilled = isFilled;
 			HasBeenTouchedByBucketFill = false;
 		}
@@ -25,29 +30,91 @@ public class VoxelController : MonoBehaviour {
 			Color = otherVoxel.Color;
 		}
 
-		public Vector3 GetLocalPos() {
-			return new Vector3(X, Y, Z);
+		
+
+		public static int GetIndex(int x, int y, int z, Vector3Int dimensions) {
+			return x + dimensions.x * (y + dimensions.y * z);
 		}
 
-		public Vector3 GetWorldPos(VoxelBuilder owner) {
-			return owner.transform.TransformPoint(GetLocalPos());
+		public static Vector3Int GetCoordinates(int index, Vector3Int dimensions) {
+			return new Vector3Int(index % dimensions.x, (index / dimensions.x) % dimensions.y, index / (dimensions.x * dimensions.y));
+		}
+
+		public static bool TryGet(int x, int y, int z, Voxel[] voxels, Vector3Int dimensions, out Voxel voxel) {
+			if(x < 0 || y < 0 || z < 0 || x >= dimensions.x || y >= dimensions.y || z >= dimensions.z) {
+				voxel = null;
+				return false;
+			}
+
+			voxel = voxels[GetIndex(x, y, z, dimensions)];
+			return true;
 		}
 	}
 
+	//public readonly struct Voxel {
+	//	public readonly int x;
+	//	public readonly int y;
+	//	public readonly int z;
+	//	public readonly bool IsFilled;
+	//	public readonly Color Color;
+
+	//	public readonly bool HasNeighborUp;
+	//	public readonly bool HasNeighborDown;
+	//	public readonly bool HasNeighborLeft;
+	//	public readonly bool HasNeighborRight;
+	//	public readonly bool HasNeighborFore;
+	//	public readonly bool HasNeighborBack;
+
+	//	public Voxel(int x, int y, int z, bool isFilled, Color color, bool hasNeighborUp, bool hasNeighborDown, bool hasNeighborLeft, bool hasNeighborRight, bool hasNeighborFore, bool hasNeighborBack) {
+	//		this.x = x;
+	//		this.y = y;
+	//		this.z = z;
+	//		IsFilled = isFilled;
+	//		Color = color;
+	//		HasNeighborUp = hasNeighborUp;
+	//		HasNeighborDown = hasNeighborDown;
+	//		HasNeighborLeft = hasNeighborLeft;
+	//		HasNeighborRight = hasNeighborRight;
+	//		HasNeighborFore = hasNeighborFore;
+	//		HasNeighborBack = hasNeighborBack;
+	//	}
+
+	//	public static Voxel GetChangedVoxel(Voxel v, bool isFilled) {
+	//		return new Voxel(v.x, v.y, v.z, isFilled, v.Color, v.HasNeighborUp, v.HasNeighborDown, v.HasNeighborLeft, v.HasNeighborRight, v.HasNeighborFore, v.HasNeighborBack);
+	//	}
+
+	//	public static Voxel GetChangedVoxel(Voxel v, Color color) {
+	//		return new Voxel(v.x, v.y, v.z, v.IsFilled, color, v.HasNeighborUp, v.HasNeighborDown, v.HasNeighborLeft, v.HasNeighborRight, v.HasNeighborFore, v.HasNeighborBack);
+	//	}
+
+	//	public static Voxel GetChangedVoxel(Voxel v, bool hasNeighborUp, bool hasNeighborDown, bool hasNeighborLeft, bool hasNeighborRight, bool hasNeighborFore, bool hasNeighborBack) {
+	//		return new Voxel(v.x, v.y, v.z, v.IsFilled, v.Color, hasNeighborUp, hasNeighborDown, hasNeighborLeft, hasNeighborRight, hasNeighborFore, hasNeighborBack);
+	//	}
+
+	//	public static Vector3 GetWorldPos(int x, int y, int z, Transform t) {
+	//		return t.TransformPoint(new Vector3(x, y, z));
+	//	}
+
+	//	public static int GetIndex(int x, int y, int z, Vector3Int dimensions) {
+	//		return x + dimensions.x * (y + dimensions.y * z);
+	//	}
+	//}
+	 
 	private class VoxelCluster {
-		private Voxel[,,] clusterVoxels;
+		private Voxel[] newVoxels;
+		private List<Voxel> newVoxelsList;
 		private int minX, minY, minZ, maxX, maxY, maxZ;
 		private Vector3 pivot;
 		private bool isStatic;
-
+		private Vector3Int newDimensions;
 		public Color color;
 
-		public void Fill(Voxel[,,] voxels, Voxel startVoxel, bool wasStatic) {
-			List<Voxel> foundVoxels = new List<Voxel>();
-			TryRecursiveAdd(startVoxel, foundVoxels, voxels);
+		public void Fill(Voxel[] oldVoxels, Vector3Int oldDimensions, Voxel startVoxel, bool wasStatic) {
+			newVoxelsList = new List<Voxel>();
+			TryRecursiveAdd(startVoxel, newVoxelsList, oldVoxels, oldDimensions);
 
 			color = new Color(Random.value, Random.value, Random.value, 1);
-			foreach(var foundVoxel in foundVoxels) {
+			foreach(var foundVoxel in newVoxelsList) {
 				foundVoxel.Color = color;
 			}
 
@@ -58,40 +125,49 @@ public class VoxelController : MonoBehaviour {
 			maxY = int.MinValue;
 			maxZ = int.MinValue;
 
-			foreach(var v in foundVoxels) {
-				minX = Mathf.Min(minX, v.X);
-				minY = Mathf.Min(minY, v.Y);
-				minZ = Mathf.Min(minZ, v.Z);
+			foreach(var v in newVoxelsList) {
+				Vector3Int coords = Voxel.GetCoordinates(v.Index, oldDimensions);
 
-				maxX = Mathf.Max(maxX, v.X);
-				maxY = Mathf.Max(maxY, v.Y);
-				maxZ = Mathf.Max(maxZ, v.Z);
+				minX = Mathf.Min(minX, coords.x);
+				minY = Mathf.Min(minY, coords.y);
+				minZ = Mathf.Min(minZ, coords.z);
+
+				maxX = Mathf.Max(maxX, coords.x);
+				maxY = Mathf.Max(maxY, coords.y);
+				maxZ = Mathf.Max(maxZ, coords.z);
 			}
 
-
-			Vector3Int size = new Vector3Int(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1);
-			clusterVoxels = new Voxel[size.x, size.y, size.z];
-			for(int z = 0; z < size.z; z++) {
-				for(int y = 0; y < size.y; y++) {
-					for(int x = 0; x < size.x; x++) {
-						clusterVoxels[x, y, z] = new Voxel(x, y, z, isFilled: false);
-					}
-				}
+			newDimensions = new Vector3Int(maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1);
+			newVoxels = new Voxel[newDimensions.x * newDimensions.y * newDimensions.z];
+		
+            for(int i = 0; i < newVoxels.Length; i++) {
+				newVoxels[i] = new Voxel(i, isFilled: false);
 			}
 
 			isStatic = wasStatic && minY == 0;
 			pivot = Vector3.zero;
 			float divisor = 0f;
 
-			foreach(var v in foundVoxels) {
-				int newX = v.X - minX;
-				int newY = v.Y - minY;
-				int newZ = v.Z - minZ;
+			foreach(var v in newVoxelsList) {
 
-				clusterVoxels[newX, newY, newZ].CopyProperties(v);
+				Vector3Int oldCoords = Voxel.GetCoordinates(v.Index, oldDimensions);
+				
+				int newX = oldCoords.x - minX;
+				int newY = oldCoords.y - minY;
+				int newZ = oldCoords.z - minZ;
 
-                if(!isStatic || newY == 0) {
-					pivot += new Vector3(newX, newY, newZ);
+				int newIndex = Voxel.GetIndex(newX, newY, newZ, newDimensions);
+
+				// hack until newVoxelsList isn't needed
+				v.Index = newIndex;
+				//
+
+				newVoxels[newIndex].CopyProperties(v);
+				
+
+				Vector3Int coords = Voxel.GetCoordinates(newIndex, newDimensions);
+                if(!isStatic || coords.y == 0) {
+					pivot += new Vector3(coords.x, coords.y, coords.z);
 					divisor++;
                 }
 			}
@@ -102,29 +178,45 @@ public class VoxelController : MonoBehaviour {
             }
 		}
 
-		private static void TryRecursiveAdd(Voxel voxel, List<Voxel> foundVoxels, Voxel[,,] grid) {
-			void TryAddNeighbor(int x, int y, int z) {
-				Voxel neighbor;
-				if(!TryGetVoxelAt(x, y, z, grid, out neighbor) || !neighbor.IsFilled || neighbor.HasBeenTouchedByBucketFill) {
+		private static void TryRecursiveAdd(Voxel voxel, List<Voxel> foundVoxels, Voxel[] grid, Vector3Int dimensions) {
+            void TryGoToNeighbor(int x, int y, int z, out bool doesNeighborExist) {
+                Voxel neighbor;
+
+				doesNeighborExist = Voxel.TryGet(x, y, z, grid, dimensions, out neighbor) && neighbor.IsFilled;
+
+                if(!doesNeighborExist || neighbor.HasBeenTouchedByBucketFill) {
 					return;
-				}
+                }
 
-				TryRecursiveAdd(neighbor, foundVoxels, grid);
-			}
+                TryRecursiveAdd(neighbor, foundVoxels, grid, dimensions);
+            }
 
-			voxel.HasBeenTouchedByBucketFill = true;
-			foundVoxels.Add(voxel);
+            voxel.HasBeenTouchedByBucketFill = true;
 
-			TryAddNeighbor(voxel.X + 1, voxel.Y, voxel.Z);
-			TryAddNeighbor(voxel.X - 1, voxel.Y, voxel.Z);
-			TryAddNeighbor(voxel.X, voxel.Y + 1, voxel.Z);
-			TryAddNeighbor(voxel.X, voxel.Y - 1, voxel.Z);
-			TryAddNeighbor(voxel.X, voxel.Y, voxel.Z + 1);
-			TryAddNeighbor(voxel.X, voxel.Y, voxel.Z - 1);
+			Vector3Int coords = Voxel.GetCoordinates(voxel.Index, dimensions);
+            TryGoToNeighbor(coords.x + 1, coords.y, coords.z, out voxel.HasNeighborRight);
+            TryGoToNeighbor(coords.x - 1, coords.y, coords.z, out voxel.HasNeighborLeft);
+            TryGoToNeighbor(coords.x, coords.y + 1, coords.z, out voxel.HasNeighborUp);
+            TryGoToNeighbor(coords.x, coords.y - 1, coords.z, out voxel.HasNeighborDown);
+            TryGoToNeighbor(coords.x, coords.y, coords.z + 1, out voxel.HasNeighborFore);
+            TryGoToNeighbor(coords.x, coords.y, coords.z - 1, out voxel.HasNeighborBack);
+
+			// OPTIMIZATION: this could save a lot of iterating, but might not be necessary after we Job-ify this
+            //if(!voxel.HasNeighborRight || !voxel.HasNeighborLeft || !voxel.HasNeighborUp || !voxel.HasNeighborDown || !voxel.HasNeighborFore || !voxel.HasNeighborBack) {
+                foundVoxels.Add(voxel);
+            //}
+        }
+
+		public Voxel[] GetVoxels() {
+			return newVoxels;
 		}
 
-		public Voxel[,,] GetVoxels() {
-			return clusterVoxels;
+		public List<Voxel> GetVoxelsAsList() {
+			return newVoxelsList;
+		}
+
+		public Vector3Int GetDimensions() {
+			return newDimensions;
 		}
 
 		public Vector3 GetPivot() {
@@ -140,14 +232,15 @@ public class VoxelController : MonoBehaviour {
 		}
 	}
 
+
 	[SerializeField] private VoxelBuilder voxelBuilder;
 	[SerializeField] private Texture2D[] textures;
 
 	[SerializeField, HideInInspector] private bool isStatic;
 	[SerializeField, HideInInspector] private bool isDescendant;
-	[SerializeField, HideInInspector] private Vector3Int size;
+	[SerializeField, HideInInspector] private Vector3Int dimensions;
 
-	private Voxel[,,] voxels;
+	private Voxel[] voxels;
 	private new Rigidbody rigidbody;
 
 	private bool isDirty;
@@ -171,17 +264,15 @@ public class VoxelController : MonoBehaviour {
 
     private void Start() {
         if(!isDescendant) {
-			voxels = new Voxel[size.x, size.y, size.z];
+			dimensions = new Vector3Int(10, 10, 10);
+			voxels = new Voxel[dimensions.x * dimensions.y * dimensions.z];
 
-			for(int z = 0; z < size.z; z++) {
-				for(int y = 0; y < size.y; y++) {
-					for(int x = 0; x < size.x; x++) {
-						voxels[x, y, z] = new Voxel(x, y, z, textures[y].GetPixel(x, z).r > 0);
-					}
-				}
+            for(int i = 0; i < voxels.Length; i++) {
+				voxels[i] = new Voxel(i, true);
 			}
 
-			voxelBuilder.transform.localPosition = new Vector3(-(size.x / 2), 0.5f, -(size.z / 2));
+
+			voxelBuilder.transform.localPosition = new Vector3(-(dimensions.x / 2), 0.5f, -(dimensions.z / 2));
 
 			isDirty = true;
 		}
@@ -195,22 +286,18 @@ public class VoxelController : MonoBehaviour {
 		}
 
 		Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-
 		List<Voxel> hits = new List<Voxel>();
-		for(int z = 0; z < size.z; z++) {
-			for(int y = 0; y < size.y; y++) {
-				for(int x = 0; x < size.x; x++) {
-					Voxel voxel = voxels[x, y, z];
+        
+		for(int i = 0; i < voxels.Length; i++) {
+			Voxel voxel = voxels[i];
 
-					if(!voxel.IsFilled) {
-						continue;
-					}
+			if(!voxel.IsFilled) {
+				continue;
+			}
 
-					Bounds b = new Bounds(voxel.GetWorldPos(voxelBuilder), Vector3.one);
-					if(b.IntersectRay(ray)) {
-						hits.Add(voxel);
-					}
-				}
+			Bounds b = new Bounds(GetVoxelWorldPos(voxel.Index), Vector3.one);
+			if(b.IntersectRay(ray)) {
+				hits.Add(voxel);
 			}
 		}
 
@@ -218,7 +305,7 @@ public class VoxelController : MonoBehaviour {
 		int closestHitIndex = -1;
 		for(int i = 0; i < hits.Count; i++) {
 			Voxel hit = hits[i];
-			float dist = Vector3.Distance(Camera.main.transform.position, hit.GetWorldPos(voxelBuilder));
+			float dist = Vector3.Distance(Camera.main.transform.position, GetVoxelWorldPos(hit.Index));
 
 			if(dist < closestHit) {
 				closestHit = dist;
@@ -228,7 +315,7 @@ public class VoxelController : MonoBehaviour {
 
 		if(closestHitIndex >= 0) {
 			Voxel hit = hits[closestHitIndex];
-			voxels[hit.X, hit.Y, hit.Z].IsFilled = false;
+			voxels[hit.Index].IsFilled = false;
 			isDirty = true;
 		}
 	}
@@ -249,31 +336,23 @@ public class VoxelController : MonoBehaviour {
 		}
 
 		List<VoxelCluster> voxelClusters = new List<VoxelCluster>();
-		for(int z = 0; z < size.z; z++) {
-			for(int y = 0; y < size.y; y++) {
-				for(int x = 0; x < size.x; x++) {
-					Voxel voxel = voxels[x, y, z];
-					
-					if(!voxel.IsFilled) {
-						continue;
-					}
-					if(voxel.HasBeenTouchedByBucketFill) {
-						continue;
-					}
+        for(int i = 0; i < voxels.Length; i++) {
+			Voxel voxel = voxels[i];
 
-					VoxelCluster newCluster = new VoxelCluster();
-					newCluster.Fill(voxels, voxel, isStatic);
-					voxelClusters.Add(newCluster);
-				}
+			if(!voxel.IsFilled) {
+				continue;
 			}
+			if(voxel.HasBeenTouchedByBucketFill) {
+				continue;
+			}
+
+			VoxelCluster newCluster = new VoxelCluster();
+			newCluster.Fill(voxels, dimensions, voxel, isStatic);
+			voxelClusters.Add(newCluster);
 		}
 
-		for(int z = 0; z < size.z; z++) {
-			for(int y = 0; y < size.y; y++) {
-				for(int x = 0; x < size.x; x++) {
-					voxels[x, y, z].HasBeenTouchedByBucketFill = false;
-				}
-			}
+        for(int i = 0; i < voxels.Length; i++) {
+			voxels[i].HasBeenTouchedByBucketFill = false;
 		}
 
 		for(int i = voxelClusters.Count - 1; i >= 0; i--) {
@@ -303,23 +382,25 @@ public class VoxelController : MonoBehaviour {
 				voxelController.voxelBuilder.transform.parent = voxelController.transform;
 			}
 
-			voxelController.ApplyNewVoxels(cluster.GetVoxels());
+			voxelController.ApplyNewVoxels(cluster);
         }
 	}
 
-	private void ApplyNewVoxels(Voxel[,,] newVoxels) {
-		voxels = newVoxels;
-		size = new Vector3Int(newVoxels.GetLength(0), newVoxels.GetLength(1), newVoxels.GetLength(2));
-		voxelBuilder.Build(voxels);
+	private void ApplyNewVoxels(VoxelCluster cluster) {
+		voxels = cluster.GetVoxels();
+		dimensions = cluster.GetDimensions();
+		voxelBuilder.Build(cluster.GetVoxelsAsList().ToArray(), dimensions);
 	}
 
-	public static bool TryGetVoxelAt(int x, int y, int z, Voxel[,,] voxels, out Voxel voxel) {
-		if(x < 0 || y < 0 || z < 0 || x >= voxels.GetLength(0) || y >= voxels.GetLength(1) || z >= voxels.GetLength(2)) {
-			voxel = null;
-			return false;
-		}
+	//private Voxel GetVoxel(int x, int y, int z) {
+	//	return voxels[Voxel.GetIndex(x, y, z, dimensions)];
+	//}
 
-		voxel = voxels[x, y, z];
-		return true;
+	public Vector3 GetVoxelLocalPos(int index) {
+		return Voxel.GetCoordinates(index, dimensions);
+	}
+
+	public Vector3 GetVoxelWorldPos(int index) {
+		return voxelBuilder.transform.TransformPoint(GetVoxelLocalPos(index));
 	}
 }
