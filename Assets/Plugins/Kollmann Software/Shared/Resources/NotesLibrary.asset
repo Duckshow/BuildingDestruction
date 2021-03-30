@@ -40,6 +40,49 @@ MonoBehaviour:
   Comments: []
   selectedObjectGUID: 1bfc947f-71fc-448a-b304-3e7d0e22fac5
   selectedObjectIsAsset: 0
+--- !u!114 &-1845393821198288149
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01dc9a4fad87a0e459780940f165e0aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Creator: Stefan Andersson
+  Description: '1. Main object has collection of subdivisions
+
+    2. Subdivisions
+    are subdivided by 8 and contain either further child clusters or voxels
+
+    3.
+    Upon voxel update, the voxel''s subdivision checks for "Inner Continuity" (bucket
+    fill) and stores the found voxel clusters in a collection along with the subdivision
+    edges they touch - if no edges are found, the cluster is separated into its own
+    Main object
+
+    4. Later, the Main object uses the cached Inner Continuity''s
+    of subdivisions to check for "Outer Continuity" - basically stepping from subdivision
+    to subdivision through the edges they touch. If Outer Continuity is broken, we
+    separate the non-continuous subdivisions into their own Main objects'
+  CreateTime: 3/29/2021 12:02:42 PM
+  SaveSelectedObject: 0
+  SaveSceneCamera: 0
+  IsResolved: 0
+  IsReplying: 0
+  HasReplyingChanged: 0
+  SceneCameraPosition: {x: 0, y: 0, z: 0}
+  SceneCameraRotation: {x: 0, y: 0, z: 0, w: 0}
+  SceneCameraOrthographic: 0
+  SceneCameraSize: 0
+  SceneCameraIs2dMode: 0
+  Category: {fileID: 7394451220972549871}
+  Comments: []
+  selectedObjectGUID: 
+  selectedObjectIsAsset: 0
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -53,7 +96,7 @@ MonoBehaviour:
   m_Name: NotesLibrary
   m_EditorClassIdentifier: 
   Notes:
-  - {fileID: -8567022712601421425}
+  - {fileID: -1845393821198288149}
   Categories:
   - {fileID: 7394451220972549871}
   ShowSelection: 0
