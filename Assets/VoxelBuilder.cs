@@ -13,39 +13,44 @@ public class VoxelBuilder : MonoBehaviour {
 		meshCollider = GetComponent<MeshCollider>();
     }
 
-    public void Build(VoxelController.Voxel[] voxels, int voxelCount, Vector3Int dimensions) {
+    public void Build(VoxelGrid voxelGrid) {
 		List<Vector3> verts = new List<Vector3>();
 		List<Color> color = new List<Color>();
 		List<Vector2> uvs = new List<Vector2>();
 		List<int> tris = new List<int>();
 
-        for(int i = 0; i < voxelCount; i++) {
-			VoxelController.Voxel voxel = voxels[i];
+        for(int i = 0; i < voxelGrid.GetVoxelCount(); i++) {
+			Voxel v = voxelGrid.GetVoxel(i);
+            if(!v.IsFilled) {
+				continue;
+            }
 
-			if(!voxel.HasNeighborRight) {
-				AddFace(voxel, dimensions, Direction.Right, verts, color, uvs, tris);
+			Vector3Int coords = VoxelGrid.IndexToCoords(i, voxelGrid.GetDimensions());
+
+			if(!v.HasNeighborRight) {
+				AddFace(v, coords, Direction.Right, verts, color, uvs, tris);
 			}
-			if(!voxel.HasNeighborLeft) {
-				AddFace(voxel, dimensions, Direction.Left, verts, color, uvs, tris);
+			if(!v.HasNeighborLeft) {
+				AddFace(v, coords, Direction.Left, verts, color, uvs, tris);
 			}
-			if(!voxel.HasNeighborUp) {
-				AddFace(voxel, dimensions, Direction.Up, verts, color, uvs, tris);
+			if(!v.HasNeighborUp) {
+				AddFace(v, coords, Direction.Up, verts, color, uvs, tris);
 			}
-			if(!voxel.HasNeighborDown) {
-				AddFace(voxel, dimensions, Direction.Down, verts, color, uvs, tris);
+			if(!v.HasNeighborDown) {
+				AddFace(v, coords, Direction.Down, verts, color, uvs, tris);
 			}
-			if(!voxel.HasNeighborFore) {
-				AddFace(voxel, dimensions, Direction.Fore, verts, color, uvs, tris);
+			if(!v.HasNeighborFore) {
+				AddFace(v, coords, Direction.Fore, verts, color, uvs, tris);
 			}
-			if(!voxel.HasNeighborBack) {
-				AddFace(voxel, dimensions, Direction.Back, verts, color, uvs, tris);
+			if(!v.HasNeighborBack) {
+				AddFace(v, coords, Direction.Back, verts, color, uvs, tris);
 			}
 		}
 
 		ApplyToMesh(meshFilter, meshCollider, verts, color, uvs, tris);
 	}
 
-	private static void AddFace(VoxelController.Voxel voxel, Vector3Int dimensions, Direction dir, List<Vector3> verts, List<Color> vertColors, List<Vector2> uvs, List<int> tris) {
+	private static void AddFace(Voxel voxel, Vector3Int coords, Direction dir, List<Vector3> verts, List<Color> vertColors, List<Vector2> uvs, List<int> tris) {
 		const float VOXEL_RADIUS = 0.5f;
 		Vector3 left = Vector3.left * VOXEL_RADIUS;
 		Vector3 right = Vector3.right * VOXEL_RADIUS;
@@ -110,11 +115,10 @@ public class VoxelBuilder : MonoBehaviour {
 
 		int oldVertCount = verts.Count;
 
-		Vector3 localPos = VoxelController.Voxel.GetCoordinates(voxel.Index, dimensions);
-		verts.Add(localPos + v0);
-		verts.Add(localPos + v1);
-		verts.Add(localPos + v2);
-		verts.Add(localPos + v3);
+		verts.Add(coords + v0);
+		verts.Add(coords + v1);
+		verts.Add(coords + v2);
+		verts.Add(coords + v3);
 
 		vertColors.Add(voxel.Color);
 		vertColors.Add(voxel.Color);
