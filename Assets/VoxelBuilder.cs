@@ -1,56 +1,106 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
-public class VoxelBuilder : MonoBehaviour {
+public class VoxelBuilder {
 	private enum Direction { Up, Down, Left, Right, Fore, Back }
 
-	private MeshFilter meshFilter;
-	private MeshCollider meshCollider;
+	private static GameObject meshObjectPrefab;
 
-    private void Awake() {
-		meshFilter = GetComponent<MeshFilter>();
-		meshCollider = GetComponent<MeshCollider>();
-    }
+	private VoxelGrid voxelGrid;
 
-    public void Build(VoxelGrid voxelGrid) {
+	private Material material;
+
+	private MeshObject[] meshObjects;
+
+	public static void SetMeshObjectPrefab(GameObject prefab) {
+		meshObjectPrefab = prefab;
+	}
+
+    public VoxelBuilder(VoxelGrid voxelGrid, Material material) {
+		this.voxelGrid = voxelGrid;
+		this.material = material;
+
+        if(!PoolManager.HasPoolForPrefab(meshObjectPrefab)) {
+			PoolManager.WarmPool(meshObjectPrefab, 5000); // TODO: let's make one pool for each combination of possible mesh - that way we never have to rebuild a mesh from scratch!
+		}
+	}
+
+	public void BuildBinGridMeshes(Bin[] bins, Vector3Int offset) {
+        if(meshObjects != null) {
+            for(int i = 0; i < meshObjects.Length; i++) {
+                if(meshObjects[i] != null) {
+					PoolManager.ReleaseObject(meshObjects[i].gameObject);
+					meshObjects[i] = null;
+				}
+			}
+        }
+
+		meshObjects = new MeshObject[bins.Length];
+
+		Color clusterColor = new Color(Random.value, Random.value, Random.value, 1f);
+		for(int i = 0; i < bins.Length; i++) {
+			ApplyBinMesh(bins[i], clusterColor, offset);
+        }
+	}
+
+	private void ApplyBinMesh(Bin bin, Color color, Vector3Int offset) {
+		Vector3Int[] binContents = bin.GetContentCoords();
+
 		List<Vector3> verts = new List<Vector3>();
-		List<Color> color = new List<Color>();
+		List<Color> colors = new List<Color>();
 		List<Vector2> uvs = new List<Vector2>();
 		List<int> tris = new List<int>();
 
-        for(int i = 0; i < voxelGrid.GetVoxelCount(); i++) {
-			Voxel v = voxelGrid.GetVoxel(i);
-            if(!v.IsFilled) {
+		for(int i = 0; i < binContents.Length; i++) {
+			Vector3Int coords = binContents[i];
+
+			Voxel v;
+            if(!Voxel.TryGetVoxel(coords, voxelGrid, out v)) {
 				continue;
             }
 
-			Vector3Int coords = VoxelGrid.IndexToCoords(i, voxelGrid.GetDimensions());
+			if(!v.IsFilled) {
+				continue;
+			}
+
+			Vector3Int localPos = coords;
 
 			if(!v.HasNeighborRight) {
-				AddFace(v, coords, Direction.Right, verts, color, uvs, tris);
+				AddFace(localPos, Direction.Right, color, verts, colors, uvs, tris);
 			}
 			if(!v.HasNeighborLeft) {
-				AddFace(v, coords, Direction.Left, verts, color, uvs, tris);
+				AddFace(localPos, Direction.Left, color, verts, colors, uvs, tris);
 			}
 			if(!v.HasNeighborUp) {
-				AddFace(v, coords, Direction.Up, verts, color, uvs, tris);
+				AddFace(localPos, Direction.Up, color, verts, colors, uvs, tris);
 			}
 			if(!v.HasNeighborDown) {
-				AddFace(v, coords, Direction.Down, verts, color, uvs, tris);
+				AddFace(localPos, Direction.Down, color, verts, colors, uvs, tris);
 			}
 			if(!v.HasNeighborFore) {
-				AddFace(v, coords, Direction.Fore, verts, color, uvs, tris);
+				AddFace(localPos, Direction.Fore, color, verts, colors, uvs, tris);
 			}
 			if(!v.HasNeighborBack) {
-				AddFace(v, coords, Direction.Back, verts, color, uvs, tris);
+				AddFace(localPos, Direction.Back, color, verts, colors, uvs, tris);
 			}
 		}
 
-		ApplyToMesh(meshFilter, meshCollider, verts, color, uvs, tris);
+		Mesh mesh = ConstructMesh(verts, colors, uvs, tris);
+		if(mesh == null) {
+			return;
+		}
+
+		Debug.Assert(meshObjects[bin.Index] == null);
+
+		meshObjects[bin.Index] = PoolManager.SpawnObject(meshObjectPrefab, voxelGrid.GetVoxelController().GetMeshTransform(), Vector3.zero, Quaternion.identity).GetComponent<MeshObject>();
+		MeshObject meshObject = meshObjects[bin.Index];
+
+		meshObject.transform.name = "MeshObject #" + bin.Index;
+		meshObject.SetMesh(mesh);
+		meshObject.SetMaterial(material);
 	}
 
-	private static void AddFace(Voxel voxel, Vector3Int coords, Direction dir, List<Vector3> verts, List<Color> vertColors, List<Vector2> uvs, List<int> tris) {
+	private static void AddFace(Vector3Int coords, Direction dir, Color color, List<Vector3> verts, List<Color> vertColors, List<Vector2> uvs, List<int> tris) {
 		const float VOXEL_RADIUS = 0.5f;
 		Vector3 left = Vector3.left * VOXEL_RADIUS;
 		Vector3 right = Vector3.right * VOXEL_RADIUS;
@@ -120,10 +170,10 @@ public class VoxelBuilder : MonoBehaviour {
 		verts.Add(coords + v2);
 		verts.Add(coords + v3);
 
-		vertColors.Add(voxel.Color);
-		vertColors.Add(voxel.Color);
-		vertColors.Add(voxel.Color);
-		vertColors.Add(voxel.Color);
+		vertColors.Add(color);
+		vertColors.Add(color);
+		vertColors.Add(color);
+		vertColors.Add(color);
 
 		uvs.Add(new Vector2(0, 0));
 		uvs.Add(new Vector2(0, 1));
@@ -138,10 +188,12 @@ public class VoxelBuilder : MonoBehaviour {
 		tris.Add(oldVertCount + 3);
 	}
 
-	private static void ApplyToMesh(MeshFilter meshFilter, MeshCollider meshCollider, List<Vector3> verts, List<Color> colors, List<Vector2> uvs, List<int> tris) {
-		Mesh mesh = meshFilter.mesh;
+	private static Mesh ConstructMesh(List<Vector3> verts, List<Color> colors, List<Vector2> uvs, List<int> tris) {
+        if(verts.Count == 0) {
+			return null;
+        }
 
-		mesh.Clear();
+		Mesh mesh = new Mesh();
 		mesh.vertices = verts.ToArray();
 		mesh.colors = colors.ToArray();
 		mesh.uv = uvs.ToArray();
@@ -149,11 +201,46 @@ public class VoxelBuilder : MonoBehaviour {
 		mesh.Optimize();
 		mesh.RecalculateNormals();
 
-		meshFilter.mesh = mesh;
-		meshCollider.sharedMesh = mesh;
-
 		verts.Clear();
 		uvs.Clear();
 		tris.Clear();
+
+		return mesh;
+	}
+
+	private static bool AreCoordsWithinDimensions(Vector3Int coords, Vector3Int dimensions) {
+		return coords.x >= 0 && coords.y >= 0 && coords.z >= 0 && coords.x < dimensions.x && coords.y < dimensions.y && coords.z < dimensions.z;
+	}
+
+    public static void RunTests() {
+		TestAddFace();
+		TestAreCoordsWithinDimension();
+    }
+
+	private static void TestAddFace() {
+		void TestAddFaceDirection(Direction dir) {
+			List<Vector3> verts = new List<Vector3>();
+			AddFace(Vector3Int.zero, dir, Color.clear, verts, new List<Color>(), new List<Vector2>(), new List<int>());
+			Debug.LogFormat("AddFace Results = {0}: {1}, {2}, {3}, {4}", dir, verts[0], verts[1], verts[2], verts[3]);
+		}
+
+		TestAddFaceDirection(Direction.Right);
+		TestAddFaceDirection(Direction.Left);
+		TestAddFaceDirection(Direction.Up);
+		TestAddFaceDirection(Direction.Down);
+		TestAddFaceDirection(Direction.Fore);
+		TestAddFaceDirection(Direction.Back);
+	}
+
+	private static void TestAreCoordsWithinDimension() {
+		Vector3Int dimensions = new Vector3Int(8, 8, 8);
+
+		Debug.Assert(AreCoordsWithinDimensions(new Vector3Int(0, 0, 0), dimensions) == true);
+		Debug.Assert(AreCoordsWithinDimensions(new Vector3Int(1, 2, 3), dimensions) == true);
+		Debug.Assert(AreCoordsWithinDimensions(dimensions - Vector3Int.one, dimensions) == true);
+
+		Debug.Assert(AreCoordsWithinDimensions(new Vector3Int(0, 0, -1), dimensions) == false);
+		Debug.Assert(AreCoordsWithinDimensions(new Vector3Int(1000, 1000, 1000), dimensions) == false);
+		Debug.Assert(AreCoordsWithinDimensions(dimensions, dimensions) == false);
 	}
 }
