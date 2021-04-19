@@ -571,7 +571,7 @@ MonoBehaviour:
   - {fileID: 2800000, guid: e00ba7f9c2f42ec4493b69ffe2f9767b, type: 3}
   - {fileID: 2800000, guid: 1c43e9860b56e75468952fc42f34c121, type: 3}
   - {fileID: 2800000, guid: 4b404206dca2bf645bf7df8a044775ef, type: 3}
-  meshTransform: {fileID: 703501606}
+  isOriginal: 1
 --- !u!4 &1972184183
 Transform:
   m_ObjectHideFlags: 0

@@ -68,8 +68,12 @@ public readonly struct Voxel {
         return GetChangedVoxel(grid[index], hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack);
     }
 
-    public static bool TryGetVoxel(Vector3Int coords, VoxelGrid grid, out Voxel voxel) {
+    public static bool TryGetVoxel(Vector3Int coords, VoxelGrid grid, out Voxel voxel) { // TODO: shouldn't send big variables like VoxelGrid anywhere
         return TryGetVoxel(coords.x, coords.y, coords.z, grid.GetVoxels(), grid.GetVoxelGridDimensions(), out voxel);
+    }
+
+    public static bool TryGetVoxel(Vector3Int coords, Voxel[] grid, Vector3Int dimensions, out Voxel voxel) {
+        return TryGetVoxel(coords.x, coords.y, coords.z, grid, dimensions, out voxel);
     }
 
     public static bool TryGetVoxel(int x, int y, int z, Voxel[] grid, Vector3Int dimensions, out Voxel voxel) {
