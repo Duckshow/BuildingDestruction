@@ -18,11 +18,6 @@ public class MeshObject : MonoBehaviour
     }
 
     public void SetMesh(Mesh mesh) {
-        if(mesh == null) {
-            PoolManager.ReleaseObject(gameObject);
-            return;
-        }
-
         meshFilter.mesh = mesh;
         meshCollider.sharedMesh = mesh;
         meshCollider.convex = true;

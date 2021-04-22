@@ -100,7 +100,7 @@ public class PoolManager : Singleton<PoolManager>
 		else
 		{
 			Destroy(clone);
-			//Debug.LogWarning("No pool contains the object: " + clone.name);
+			Debug.LogWarning("No pool contains the object: " + clone.name);
 		}
 	}
 

@@ -538,6 +538,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1972184183}
   - component: {fileID: 1972184182}
+  - component: {fileID: 1972184186}
+  - component: {fileID: 1972184185}
   - component: {fileID: 1972184184}
   m_Layer: 0
   m_Name: VoxelController
@@ -558,19 +560,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ac483f298657a24190502f522164f4e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  meshObjectPrefab: {fileID: 4187036531089298799, guid: 692307d3a44a9da4db3547cecfd8e1a5, type: 3}
-  material: {fileID: 2100000, guid: d350e0d5dd92ed34bb83431540d96967, type: 2}
-  textures:
-  - {fileID: 2800000, guid: 18541b910ff9e0143bfa02e643e6f6ea, type: 3}
-  - {fileID: 2800000, guid: d11b30e67533bfd44b40f146e84403d6, type: 3}
-  - {fileID: 2800000, guid: c08bfde3e19c66e4fab503fffbb04fd3, type: 3}
-  - {fileID: 2800000, guid: 0f4e2ed69a6b3b24a98e1e91ed844839, type: 3}
-  - {fileID: 2800000, guid: 453f277464fce8044848817ba644c1b2, type: 3}
-  - {fileID: 2800000, guid: 79fe4aae91df7e14da8890958b56cbd3, type: 3}
-  - {fileID: 2800000, guid: 4fa82d22b72fe044daf429993814c564, type: 3}
-  - {fileID: 2800000, guid: e00ba7f9c2f42ec4493b69ffe2f9767b, type: 3}
-  - {fileID: 2800000, guid: 1c43e9860b56e75468952fc42f34c121, type: 3}
-  - {fileID: 2800000, guid: 4b404206dca2bf645bf7df8a044775ef, type: 3}
+  meshTransform: {fileID: 703501606}
   isOriginal: 1
 --- !u!4 &1972184183
 Transform:
@@ -603,6 +593,33 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &1972184185
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1972184181}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28a9cf079063cff46983fbe9cac63934, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  meshObjectPrefab: {fileID: 4187036531089298799, guid: 692307d3a44a9da4db3547cecfd8e1a5, type: 3}
+  material: {fileID: 2100000, guid: d350e0d5dd92ed34bb83431540d96967, type: 2}
+  meshTransform: {fileID: 703501606}
+--- !u!114 &1972184186
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1972184181}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 084057c3839422b43b93ab35c8ec3d5e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2064405285
 GameObject:
   m_ObjectHideFlags: 1

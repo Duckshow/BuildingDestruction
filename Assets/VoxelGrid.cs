@@ -1,18 +1,18 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class VoxelGrid
+[RequireComponent(typeof(VoxelBuilder))]
+public class VoxelGrid : MonoBehaviour
 {
-    private VoxelController voxelController;
     private VoxelBuilder voxelBuilder;
-
-    private Vector3Int voxelGridDimensions;
 
     private Voxel[] voxels;
     private Bin[] bins;
+    
+    private Vector3Int voxelGridDimensions;
 
     public delegate void VoxelEvent(int index);
-    public VoxelEvent OnVoxelUpdated;
+    private VoxelEvent onVoxelUpdated;
 
     #region Getter Functions
     public Vector3Int GetVoxelGridDimensions() { return voxelGridDimensions; }
@@ -24,21 +24,29 @@ public class VoxelGrid
         );
     }
 
-    public Voxel GetVoxel(Vector3Int coords) { return voxels[CoordsToIndex(coords, voxelGridDimensions)]; }
-    public Voxel GetVoxel(int index) { return voxels[index]; }
-    public Voxel[] GetVoxels() { return voxels; }
-    public int GetVoxelCount() { return voxels.Length; }
-    public VoxelController GetVoxelController() { return voxelController; }
-    #endregion
+    public bool TryGetVoxel(int x, int y, int z, out Voxel voxel) {
+        if(x < 0 || y < 0 || z < 0 || x >= voxelGridDimensions.x || y >= voxelGridDimensions.y || z >= voxelGridDimensions.z) {
+            voxel = new Voxel();
+            return false;
+        }
 
-    public VoxelGrid(VoxelController voxelController, VoxelEvent onVoxelUpdatedCallback) {
-        this.voxelController = voxelController;
-        voxelBuilder = new VoxelBuilder(this, voxelController.GetMaterial());
-
-        OnVoxelUpdated = onVoxelUpdatedCallback;
+        voxel = voxels[CoordsToIndex(x, y, z, voxelGridDimensions)];
+        return true;
     }
 
-    public void ApplySettings(Voxel[] voxels, Vector3Int dimensions, Vector3Int offset, bool isOriginalSetup) {
+    public int GetVoxelCount() { return voxels.Length; }
+    #endregion
+
+
+    private void Awake() {
+        voxelBuilder = GetComponent<VoxelBuilder>();
+    }
+
+    public void SubscribeToOnVoxelUpdate(VoxelEvent onVoxelUpdatedCallback) {
+        onVoxelUpdated = onVoxelUpdatedCallback;
+    }
+
+    public void ApplySettings(Voxel[] voxels, Vector3Int dimensions, bool isOriginalSetup) {
         Debug.AssertFormat(voxels.Length == dimensions.x * dimensions.y * dimensions.z, "{0} != {1}*{2}*{3} ({4})", voxels.Length, dimensions.x, dimensions.y, dimensions.z, dimensions.x * dimensions.y * dimensions.z);
 
         voxelGridDimensions = dimensions;
@@ -49,52 +57,54 @@ public class VoxelGrid
         int binCount = binGridDimensions.x * binGridDimensions.y * binGridDimensions.z;
         bins = new Bin[binCount];
         for(int i = 0; i < binCount; i++) {
-            bins[i] = new Bin(i, voxelGridDimensions); // TODO: if we're storing any values in bins, we should migrate them here
+            bins[i] = new Bin(i); // TODO: if we're storing any values in bins, we should migrate them here
         }
 
         if(!isOriginalSetup) {
-            voxelBuilder.BuildBinGridMeshes(bins, offset);
+            voxelBuilder.Refresh();
         }
-    }
-
-    public void SetVoxelIsFilled(int x, int y, int z, bool isFilled) {
-        int index = CoordsToIndex(x, y, z, voxelGridDimensions);
-        SetVoxelIsFilled(index, isFilled);
     }
 
     public void SetVoxelIsFilled(int index, bool isFilled) {
         voxels[index] = Voxel.GetChangedVoxel(voxels[index], isFilled);
         
-        if(OnVoxelUpdated != null) {
-            OnVoxelUpdated(index);
+        if(onVoxelUpdated != null) {
+            onVoxelUpdated(index);
         }
     }
 
-    public List<VoxelCluster> FindVoxelClusters(Queue<int> startingPoints) {
-        return FindVoxelClusters(startingPoints, voxels, voxelGridDimensions);
+    public void RefreshVoxelHasNeighborValues(int index) {
+        Vector3Int coords = IndexToCoords(index, voxelGridDimensions);
+
+        Voxel neighbor;
+        bool hasNeighborRight   = TryGetVoxel(coords.x + 1, coords.y, coords.z, out neighbor) && neighbor.IsFilled;
+        bool hasNeighborLeft    = TryGetVoxel(coords.x - 1, coords.y, coords.z, out neighbor) && neighbor.IsFilled;
+        bool hasNeighborUp      = TryGetVoxel(coords.x, coords.y + 1, coords.z, out neighbor) && neighbor.IsFilled;
+        bool hasNeighborDown    = TryGetVoxel(coords.x, coords.y - 1, coords.z, out neighbor) && neighbor.IsFilled;
+        bool hasNeighborFore    = TryGetVoxel(coords.x, coords.y, coords.z + 1, out neighbor) && neighbor.IsFilled;
+        bool hasNeighborBack    = TryGetVoxel(coords.x, coords.y, coords.z - 1, out neighbor) && neighbor.IsFilled;
+
+        voxels[index] = Voxel.GetChangedVoxel(voxels[index], hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack);
     }
 
-    private static List<VoxelCluster> FindVoxelClusters(Queue<int> startingPoints, Voxel[] grid, Vector3Int gridDimensions) {
-        List<VoxelCluster> clusters = new List<VoxelCluster>(); // TODO: maybe replace this with a queue, but low prio
+    public bool TryFindVoxelCluster(int startVoxelIndex, bool[] visitedVoxels, out VoxelCluster cluster) {
+        return TryFindVoxelCluster(startVoxelIndex, voxels, voxelGridDimensions, visitedVoxels, out cluster);
+    }
 
-        bool[] visitedVoxels = new bool[grid.Length]; // TODO: if I cached how many voxels have been visited, we could just break the loop when that number is reached, thus potentially saving a bunch of iterating
+    public static bool TryFindVoxelCluster(int startVoxelIndex, Voxel[] grid, Vector3Int gridDimensions, bool[] visitedVoxels, out VoxelCluster cluster) {
+        cluster = null;
 
-        while(startingPoints.Count > 0) {
-            int index = startingPoints.Dequeue();
-
-            if(visitedVoxels[index]) {
-                continue;
-            }
-
-            Voxel voxel = grid[index];
-            if(!voxel.IsFilled) {
-                continue;
-            }
-
-            clusters.Add(new VoxelCluster(voxel, grid, gridDimensions, visitedVoxels));
+        if(visitedVoxels[startVoxelIndex]) {
+            return false;
         }
 
-        return clusters;
+        Voxel voxel = grid[startVoxelIndex];
+        if(!voxel.IsFilled) {
+            return false;
+        }
+
+        cluster = new VoxelCluster(voxel, grid, gridDimensions, visitedVoxels);
+        return true;
     }
 
     public static int GetBiggestVoxelClusterIndex(List<VoxelCluster> clusters) {
@@ -137,53 +147,8 @@ public class VoxelGrid
 
     #region Test Functions
     public static void RunTests() {
-        TestCoordsToIndexAndIndexToCoords();
-        TestVoxelToBinIndex();
         TestGetBiggestVoxelClusterIndex();
-    }
-
-    private static void TestCoordsToIndexAndIndexToCoords() {
-        Vector3Int dimensions = new Vector3Int(8, 8, 8);
-
-        for(int z = 0; z < dimensions.z; z++) {
-            for(int y = 0; y < dimensions.y; y++) {
-                for(int x = 0; x < dimensions.x; x++) {
-                    Vector3Int coords = new Vector3Int(x, y, z);
-                    
-                    int resultIndex = CoordsToIndex(coords, dimensions);
-                    Vector3Int resultCoords = IndexToCoords(resultIndex, dimensions);
-
-                    Debug.Assert(coords == resultCoords);
-                }
-            }
-        }
-
-        Vector3Int minCoords = new Vector3Int(0, 0, 0);
-        Vector3Int maxCoords = dimensions - Vector3Int.one;
-
-        int minIndex = 0;
-        int maxIndex = (dimensions.x * dimensions.y * dimensions.z) - 1;
-
-        int minResultIndex = CoordsToIndex(minCoords, dimensions);
-        int maxResultIndex = CoordsToIndex(maxCoords, dimensions);
-        Vector3Int minResultCoords = IndexToCoords(minIndex, dimensions);
-        Vector3Int maxResultCoords = IndexToCoords(maxIndex, dimensions);
-
-        Debug.Assert(minResultIndex == minIndex, string.Format("{0} != {1}", minResultIndex, minIndex));
-        Debug.Assert(maxResultIndex == maxIndex, string.Format("{0} != {1}", maxResultIndex, maxIndex));
-        Debug.Assert(minResultCoords == minCoords, string.Format("{0} != {1}", minResultCoords, minCoords));
-        Debug.Assert(maxResultCoords == maxCoords, string.Format("{0} != {1}", maxResultCoords, maxCoords));
-    }
-
-    private static void TestVoxelToBinIndex() {
-        Vector3Int voxelGridDimensions = new Vector3Int(4, 4, 4);
-
-        int voxelCount = voxelGridDimensions.x * voxelGridDimensions.y * voxelGridDimensions.z;
-
-        for(int i = 0; i < voxelCount; i++) {
-            int binIndex = VoxelToBinIndex(i, voxelGridDimensions);
-            Debug.LogFormat("VoxelToBinIndex Results: {0} -> {1}", i, binIndex);
-        }
+        Debug.Log("Tests done.");
     }
 
     private static void TestGetBiggestVoxelClusterIndex() {

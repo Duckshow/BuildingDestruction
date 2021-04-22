@@ -69,22 +69,18 @@ public static class VoxelMeshFactory
 
 	private static Dictionary<ulong, Mesh> cachedMeshes = new Dictionary<ulong, Mesh>();
 
+	public static bool TryGetMesh(int index, Voxel?[] binVoxels, out Mesh mesh) {
+		ulong id = GetID(binVoxels);
 
-	public static Mesh GetMesh(Bin bin, Voxel[] voxelGrid, Vector3Int gridDimensions) { // TODO: I really hate having to send grid and dimensions everywhere - better solution?
-		return GetMesh(GetBinVoxels(bin, voxelGrid, gridDimensions));
-	}
-
-	private static Mesh GetMesh(Voxel?[] voxels) {
-		ulong id = GetID(voxels);
-
-		Mesh mesh;
 		if(ShouldUseCachedMesh(id)) {
-			return cachedMeshes[id];
+			mesh = cachedMeshes[id];
+			return mesh != null;
 		}
 
-		mesh = ConstructNewMesh(voxels);
+		mesh = ConstructNewMesh(binVoxels);
 		cachedMeshes.Add(id, mesh);
-		return mesh;
+
+		return mesh != null;
 	}
 
 	private static bool ShouldUseCachedMesh(ulong id) {
@@ -126,6 +122,8 @@ public static class VoxelMeshFactory
 		int faceIndex = 0;
 		int triIndex = 0;
 
+		Vector3Int[] voxelLocalCoords = Bin.GetContentsLocalCoords(Vector3Int.zero);
+
 		for(int i = 0; i < binVoxels.Length; i++) {
 			if(!binVoxels[i].HasValue) {
 				continue;
@@ -137,24 +135,24 @@ public static class VoxelMeshFactory
 				continue;
 			}
 
-			if(!v.HasNeighborRight) { AddFace(Direction.Right,	ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!v.HasNeighborLeft)	{ AddFace(Direction.Left,	ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!v.HasNeighborUp)	{ AddFace(Direction.Up,		ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!v.HasNeighborDown)	{ AddFace(Direction.Down,	ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!v.HasNeighborFore)	{ AddFace(Direction.Fore,	ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!v.HasNeighborBack)	{ AddFace(Direction.Back,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!v.HasNeighborRight) { AddFace(voxelLocalCoords[i], Direction.Right,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!v.HasNeighborLeft)	{ AddFace(voxelLocalCoords[i], Direction.Left,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!v.HasNeighborUp)	{ AddFace(voxelLocalCoords[i], Direction.Up,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!v.HasNeighborDown)	{ AddFace(voxelLocalCoords[i], Direction.Down,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!v.HasNeighborFore)	{ AddFace(voxelLocalCoords[i], Direction.Fore,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!v.HasNeighborBack)	{ AddFace(voxelLocalCoords[i], Direction.Back,	ref faceIndex, ref triIndex, verts, uvs, tris); }
 		}
 
 		return AssembleMesh(verts, uvs, tris);
 	}
 
-	private static void AddFace(Direction dir, ref int faceIndex, ref int triIndex, Vector3[] verts, Vector2[] uvs, int[] tris) {
+	private static void AddFace(Vector3Int voxelLocalCoords, Direction dir, ref int faceIndex, ref int triIndex, Vector3[] verts, Vector2[] uvs, int[] tris) {
 		Vector3[] faceVerts = GetVertsForFace(dir);
 
-		verts[faceIndex + 0] = faceVerts[0];
-		verts[faceIndex + 1] = faceVerts[1];
-		verts[faceIndex + 2] = faceVerts[2];
-		verts[faceIndex + 3] = faceVerts[3];
+		verts[faceIndex + 0] = voxelLocalCoords + faceVerts[0];
+		verts[faceIndex + 1] = voxelLocalCoords + faceVerts[1];
+		verts[faceIndex + 2] = voxelLocalCoords + faceVerts[2];
+		verts[faceIndex + 3] = voxelLocalCoords + faceVerts[3];
 
 		uvs[faceIndex + 0] = new Vector2(0, 0);
 		uvs[faceIndex + 1] = new Vector2(0, 1);
@@ -187,32 +185,13 @@ public static class VoxelMeshFactory
 		return mesh;
 	}
 
-	private static Voxel?[] GetBinVoxels(Bin bin, Voxel[] voxelGrid, Vector3Int gridDimensions) {
-		Voxel?[] voxels = new Voxel?[Bin.SIZE];
-
-		Vector3Int[] binContents = bin.GetContentCoords();
-		for(int i = 0; i < binContents.Length; i++) {
-			Vector3Int coords = binContents[i];
-
-			Voxel v;
-			if(Voxel.TryGetVoxel(coords, voxelGrid, gridDimensions, out v)) {
-				voxels[i] = v;
-			}
-			else {
-				voxels[i] = null;
-			}
-		}
-
-		return voxels;
-	}
-
-	private static ulong GetID(Voxel?[] voxels) {
-		Debug.Assert(voxels.Length == Bin.SIZE);
+	private static ulong GetID(Voxel?[] binVoxels) {
+		Debug.Assert(binVoxels.Length == Bin.SIZE);
 
 		ulong id = 0;
 
 		for(int i = 0; i < Bin.SIZE; i++) {
-			Voxel? v = voxels[i];
+			Voxel? v = binVoxels[i];
 
 			const int SIDES = 6;
 			int offset = i * SIDES;
@@ -248,12 +227,17 @@ public static class VoxelMeshFactory
 
 	private static void TestGetMesh() {
 		Voxel?[] voxels = new Voxel?[Bin.SIZE];
+		Vector3Int dimensions = new Vector3Int(Bin.WIDTH, Bin.WIDTH, Bin.WIDTH);
+
         for(int z = 0; z < Bin.WIDTH; z++) {
             for(int y = 0; y < Bin.WIDTH; y++) {
                 for(int x = 0; x < Bin.WIDTH; x++) {
-					int i = VoxelGrid.CoordsToIndex(x, y, z, new Vector3Int(Bin.WIDTH, Bin.WIDTH, Bin.WIDTH));
+					Vector3Int coords = new Vector3Int(x, y, z);
+					int i = VoxelGrid.CoordsToIndex(coords, dimensions);
+
 					voxels[i] = new Voxel(
-						i, 
+						i,
+						coords,
 						isFilled: true, 
 						hasNeighborRight: x < Bin.WIDTH - 1,
 						hasNeighborLeft: x > 0,
@@ -262,7 +246,7 @@ public static class VoxelMeshFactory
 						hasNeighborFore: z < Bin.WIDTH - 1,
 						hasNeighborBack: z > 0
 						);
-                }
+				}
             }
         }
 
@@ -271,9 +255,9 @@ public static class VoxelMeshFactory
 		cachedMeshes.Clear();
 
 		Debug.Assert(ShouldUseCachedMesh(id) == false);
-		Mesh mesh1 = GetMesh(voxels);
+		TryGetMesh(0, voxels, out Mesh mesh1);
 		Debug.Assert(ShouldUseCachedMesh(id) == true);
-		Mesh mesh2 = GetMesh(voxels);
+		TryGetMesh(0, voxels, out Mesh mesh2);
 		Debug.Assert(ShouldUseCachedMesh(id) == true);
 
 		Debug.Assert(mesh1 != null);
@@ -285,126 +269,56 @@ public static class VoxelMeshFactory
 
 	private static void TestGetID() {
 		Voxel?[] voxels;
-		ulong id;
-		string idString;
 
-		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false),
-			new Voxel(1, isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false),
-			new Voxel(2, isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false),
-			new Voxel(3, isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false),
-			new Voxel(4, isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false),
-			new Voxel(5, isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false),
-			new Voxel(6, isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false),
-			new Voxel(7, isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false)
-		};
+		Voxel?[] GetVoxels(bool isFilled, bool hasNeighborRight, bool hasNeighborLeft, bool hasNeighborUp, bool hasNeighborDown, bool hasNeighborFore, bool hasNeighborBack) { 
+			return new Voxel?[] {
+				new Voxel(0, new Vector3Int(0, 0, 0), isFilled, hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack),
+				new Voxel(1, new Vector3Int(1, 0, 0), isFilled, hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack),
+				new Voxel(2, new Vector3Int(0, 1, 0), isFilled, hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack),
+				new Voxel(3, new Vector3Int(1, 1, 0), isFilled, hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack),
+				new Voxel(4, new Vector3Int(0, 0, 1), isFilled, hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack),
+				new Voxel(5, new Vector3Int(1, 0, 1), isFilled, hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack),
+				new Voxel(6, new Vector3Int(0, 1, 1), isFilled, hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack),
+				new Voxel(7, new Vector3Int(1, 1, 1), isFilled, hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack)
+			};
+		}
+
+		voxels = GetVoxels(isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false);
 		Debug.LogFormat("GetID Results, No neighbors: " + System.Convert.ToString((long)GetID(voxels), 2));
 
-		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(1, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(2, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(3, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(4, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(5, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(6, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(7, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true)
-		};
+		voxels = GetVoxels(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, All neighbors: " + System.Convert.ToString((long)GetID(voxels), 2));
 
-		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(1, isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(2, isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(3, isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(4, isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(5, isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(6, isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(7, isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true)
-		};
+		voxels = GetVoxels(isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results: No neighbors right" + System.Convert.ToString((long)GetID(voxels), 2));
 
-		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(1, isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(2, isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(3, isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(4, isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(5, isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(6, isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(7, isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true)
-		};
+		voxels = GetVoxels(isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No neighbors left: " + System.Convert.ToString((long)GetID(voxels), 2));
 
-		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(1, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(2, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(3, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(4, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(5, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(6, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(7, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true)
-		};
+		voxels = GetVoxels(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No neighbors up: " + System.Convert.ToString((long)GetID(voxels), 2));
 
-		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(1, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(2, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(3, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(4, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(5, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(6, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(7, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true)
-		};
+		voxels = GetVoxels(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No neighbors down: " + System.Convert.ToString((long)GetID(voxels), 2));
 
-		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true),
-			new Voxel(1, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true),
-			new Voxel(2, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true),
-			new Voxel(3, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true),
-			new Voxel(4, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true),
-			new Voxel(5, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true),
-			new Voxel(6, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true),
-			new Voxel(7, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true)
-		};
+		voxels = GetVoxels(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No neighbors fore: " + System.Convert.ToString((long)GetID(voxels), 2));
 
-		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false),
-			new Voxel(1, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false),
-			new Voxel(2, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false),
-			new Voxel(3, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false),
-			new Voxel(4, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false),
-			new Voxel(5, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false),
-			new Voxel(6, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false),
-			new Voxel(7, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false)
-		};
+		voxels = GetVoxels(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false);
 		Debug.LogFormat("GetID Results, No neighbors back: " + System.Convert.ToString((long)GetID(voxels), 2));
 
-		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(1, isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(2, isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(3, isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(4, isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(5, isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(6, isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(7, isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true)
-		};
+		voxels = GetVoxels(isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No filled: " + System.Convert.ToString((long)GetID(voxels), 2));
 
 		voxels = new Voxel?[] {
-			new Voxel(0, isFilled: false,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(1, isFilled: true,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(2, isFilled: false,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(3, isFilled: true,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(4, isFilled: false,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(5, isFilled: true,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(6, isFilled: false,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
-			new Voxel(7, isFilled: true,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true)
+			new Voxel(0, new Vector3Int(0, 0, 0), isFilled: false,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(1, new Vector3Int(1, 0, 0), isFilled: true,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(2, new Vector3Int(0, 1, 0), isFilled: false,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(3, new Vector3Int(1, 1, 0), isFilled: true,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(4, new Vector3Int(0, 0, 1), isFilled: false,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(5, new Vector3Int(1, 0, 1), isFilled: true,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(6, new Vector3Int(0, 1, 1), isFilled: false,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(7, new Vector3Int(1, 1, 1), isFilled: true,	hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true)
 		};
 		Debug.LogFormat("GetID Results, Every second filled: " + System.Convert.ToString((long)GetID(voxels), 2));
 
@@ -422,13 +336,13 @@ public static class VoxelMeshFactory
 
 		voxels = new Voxel?[] {
 			null,
-			new Voxel(1, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(1, new Vector3Int(1, 0, 0), isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
 			null,
-			new Voxel(3, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(3, new Vector3Int(1, 1, 0), isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
 			null,
-			new Voxel(5, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
+			new Voxel(5, new Vector3Int(1, 0, 1), isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true),
 			null,
-			new Voxel(7, isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true)
+			new Voxel(7, new Vector3Int(1, 1, 1), isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true)
 		};
 		Debug.LogFormat("GetID Results, Every second null: " + System.Convert.ToString((long)GetID(voxels), 2));
 	}

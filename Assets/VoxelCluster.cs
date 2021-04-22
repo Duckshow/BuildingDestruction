@@ -50,22 +50,21 @@ public class VoxelCluster {
 
 	private static void EvaluateNextVoxel(Voxel[] grid, Queue<int> q1, Queue<int> q2, bool[] visitedVoxels, Vector3Int dimensions, ref Vector3Int minCoord, ref Vector3Int maxCoord) {
 		int index = q1.Dequeue();
+
 		if(visitedVoxels[index]) {
 			return;
 		}
 
 		visitedVoxels[index] = true;
 
-		Voxel v = Voxel.GetUpdatedHasNeighborValues(index, grid, dimensions);
-		grid[index] = v;
-
+		Voxel v = grid[index];
 		if(!v.IsFilled) {
 			return;
 		}
 
 		q2.Enqueue(index);
 
-		Vector3Int coords = VoxelGrid.IndexToCoords(index, dimensions);
+		Vector3Int coords = v.Coords; //VoxelGrid.IndexToCoords(index, dimensions);
 		minCoord.x = Mathf.Min(minCoord.x, coords.x);
 		minCoord.y = Mathf.Min(minCoord.y, coords.y);
 		minCoord.z = Mathf.Min(minCoord.z, coords.z);
@@ -73,21 +72,21 @@ public class VoxelCluster {
 		maxCoord.y = Mathf.Max(maxCoord.y, coords.y);
 		maxCoord.z = Mathf.Max(maxCoord.z, coords.z);
 
-		if(v.HasNeighborRight)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords + Vector3Int.right, dimensions));
-		if(v.HasNeighborLeft)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords + Vector3Int.left, dimensions));
-		if(v.HasNeighborUp)		q1.Enqueue(VoxelGrid.CoordsToIndex(coords + Vector3Int.up, dimensions));
-		if(v.HasNeighborDown)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords + Vector3Int.down, dimensions));
-		if(v.HasNeighborFore)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords + Vector3Int.forward, dimensions));
-		if(v.HasNeighborBack)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords + Vector3Int.back, dimensions));
+		if(v.HasNeighborRight)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x + 1, coords.y, coords.z, dimensions));
+		if(v.HasNeighborLeft)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x - 1, coords.y, coords.z, dimensions));
+		if(v.HasNeighborUp)		q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x, coords.y + 1, coords.z, dimensions));
+		if(v.HasNeighborDown)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x, coords.y - 1, coords.z, dimensions));
+		if(v.HasNeighborFore)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x, coords.y, coords.z + 1, dimensions));
+		if(v.HasNeighborBack)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x, coords.y, coords.z - 1, dimensions));
 	}
 
 	private static Voxel AdjustVoxelIndex(Voxel v, Vector3Int minCoord, Vector3Int oldDimensions, Vector3Int newDimensions) {
-		Vector3Int oldCoords = VoxelGrid.IndexToCoords(v.Index, oldDimensions);
-		Vector3Int newCoords = oldCoords - minCoord;
-		int newIndex = VoxelGrid.CoordsToIndex(newCoords, newDimensions);
+		//Vector3Int oldCoords = VoxelGrid.IndexToCoords(v.Index, oldDimensions);
+        Vector3Int newCoords = v.Coords - minCoord;
+        int newIndex = VoxelGrid.CoordsToIndex(newCoords, newDimensions);
 
-		return new Voxel(newIndex, v);
-	}
+        return new Voxel(newIndex, newCoords, v);
+    }
 
 	public static void RunTests() {
 		TestEvaluateNextVoxel();
@@ -96,7 +95,6 @@ public class VoxelCluster {
 
 	private static void TestEvaluateNextVoxel() {
 		Vector3Int dimensions = new Vector3Int(8, 8, 8);
-		Vector3Int clusterDimensions = new Vector3Int(4, 5, 6);
 		Voxel[] grid = new Voxel[dimensions.x * dimensions.y * dimensions.z];
 
 		Queue<int> q1 = new Queue<int>();
@@ -112,20 +110,22 @@ public class VoxelCluster {
 			Vector3Int coords = VoxelGrid.IndexToCoords(index, dimensions);
 
 			grid[index] = new Voxel(
-						index,
-						isFilled: true,
-						hasNeighborRight: coords.x < clusterDimensions.x - 1,
-						hasNeighborLeft: coords.x > 0,
-						hasNeighborUp: coords.y < clusterDimensions.y - 1,
-						hasNeighborDown: coords.y > 0,
-						hasNeighborFore: coords.z < clusterDimensions.z - 1,
-						hasNeighborBack: coords.z > 0);
+				index, 
+				coords,
+				isFilled: true, 
+				hasNeighborRight: coords.x < dimensions.x - 1, 
+				hasNeighborLeft: coords.x > 0, 
+				hasNeighborUp: coords.y < dimensions.y - 1, 
+				hasNeighborDown: coords.y > 0, 
+				hasNeighborFore: coords.z < dimensions.z - 1, 
+				hasNeighborBack: coords.z > 0
+			);
 
 			EvaluateNextVoxel(grid, q1, q2, visitedVoxels, dimensions, ref minCoord, ref maxCoord);
 			Debug.Assert(visitedVoxels[index]);
 		}
 
-		Debug.LogFormat("EvaluateNextVoxel Result = Grid Dimensions: {0}, Cluster Dimensions: {1}, MinCoord: {2}, MaxCoord: {3}", dimensions, clusterDimensions, minCoord, maxCoord);
+		Debug.LogFormat("EvaluateNextVoxel Result = Grid Dimensions: {0}, MinCoord: {1}, MaxCoord: {2}", dimensions, minCoord, maxCoord);
 	}
 
 	private static void TestAdjustVoxelIndex() {
@@ -138,8 +138,9 @@ public class VoxelCluster {
 		for(int z = 0; z < newDimensions.z; z++) {
 			for(int y = 0; y < newDimensions.y; y++) {
 				for(int x = 0; x < newDimensions.x; x++) {
-					int oldIndex = VoxelGrid.CoordsToIndex(minCoords + new Vector3Int(x, y, z), oldDimensions);
-					Voxel v = AdjustVoxelIndex(new Voxel(oldIndex), minCoords, oldDimensions, newDimensions);
+					Vector3Int oldCoords = minCoords + new Vector3Int(x, y, z);
+					int oldIndex = VoxelGrid.CoordsToIndex(oldCoords, oldDimensions);
+					Voxel v = AdjustVoxelIndex(new Voxel(oldIndex, oldCoords), minCoords, oldDimensions, newDimensions);
 
 					Debug.Assert(v.Index - lastIndexFound == 1);
 					lastIndexFound = v.Index;

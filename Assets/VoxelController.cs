@@ -1,34 +1,31 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(VoxelGrid), typeof(Rigidbody))]
 public class VoxelController : MonoBehaviour {
 
 	private static bool DEBUG = false;
 
-	[SerializeField] private GameObject meshObjectPrefab;
-	[SerializeField] private Material material;
-	[SerializeField] private Texture2D[] textures;
-
+	[SerializeField] private Transform meshTransform;
 	[SerializeField, HideInInspector] private bool isOriginal = true;
-	
-	private Transform meshTransform;
 
 	private VoxelGrid voxelGrid;
-	private bool isStatic;
-	private Color color;
 	private new Rigidbody rigidbody;
+
+	private bool isStatic;
 	private Queue<int> dirtyVoxels = new Queue<int>();
 
 	private const float UPDATE_LATENCY = 0.1f;
 	private float timeToUpdate;
 
     private void Awake() {
-		VoxelBuilder.SetMeshObjectPrefab(meshObjectPrefab); // TODO: handle dependencies such as this in a better way, this makes no sense
-	}
+		rigidbody = GetComponent<Rigidbody>();
+		voxelGrid = GetComponent<VoxelGrid>();
+    }
 
-	private void Start() {
-		TrySetupDependencies();
+    private void Start() {
+		//meshTransform = TryGetNewMeshTransform(transform);
+		voxelGrid.SubscribeToOnVoxelUpdate(OnVoxelUpdated);
 
 		if(isOriginal) {
 			Vector3Int dimensions = new Vector3Int(16, 16, 16);
@@ -38,7 +35,7 @@ public class VoxelController : MonoBehaviour {
 
             Voxel[] voxels = new Voxel[dimensions.x * dimensions.y * dimensions.z];
             for(int i = 0; i < voxels.Length; i++) {
-				voxels[i] = new Voxel(i);
+				voxels[i] = new Voxel(i, VoxelGrid.IndexToCoords(i, dimensions));
             }
 
 			ApplySettings(voxels, dimensions, offset: Vector3Int.zero, isStatic: true, isOriginalSetup: true);
@@ -49,30 +46,25 @@ public class VoxelController : MonoBehaviour {
 		}
 	}
 
-	private void TrySetupDependencies() {
-        if(rigidbody == null) {
-            rigidbody = GetComponent<Rigidbody>();
-        }
+	//private static Transform TryGetNewMeshTransform(Transform root) {
+	//	Transform meshTransform;
+        
+	//	if(root.childCount > 0) {
+ //           meshTransform = root.GetChild(0);
+ //       }
+ //       else {
+	//		Debug.Log("Made my own meshtransform!");
+ //           GameObject child = new GameObject();
+ //           child.transform.parent = root;
+ //           child.transform.localPosition = Vector3.zero;
+ //           meshTransform = child.transform;
+ //       }
 
-        if(meshTransform == null) {
-            if(transform.childCount > 0) {
-                meshTransform = transform.GetChild(0);
-            }
-            else {
-				Debug.Log("Made my own meshtransform!");
-                GameObject child = new GameObject();
-                child.transform.parent = transform;
-                child.transform.localPosition = Vector3.zero;
-                meshTransform = child.transform;
-            }
-
-            meshTransform.name = "MeshTransform";
-        }
-
-        if(voxelGrid == null) {
-            voxelGrid = new VoxelGrid(this, OnVoxelUpdated);
-        }
-    }
+	//	Debug.AssertFormat(meshTransform.GetComponents<Component>() == null, "Tried to use {0} as MeshTransform!", meshTransform.name);
+	//	meshTransform.name = "MeshTransform";
+		
+	//	return meshTransform;
+ //   }
 
 	private void Update() {
 		rigidbody.isKinematic = isStatic;
@@ -84,9 +76,9 @@ public class VoxelController : MonoBehaviour {
         if(Input.GetKeyDown(KeyCode.Space)) {
             for(int z = 0; z < voxelGrid.GetVoxelGridDimensions().z; z++) {
                 for(int y = 0; y < voxelGrid.GetVoxelGridDimensions().y; y++) {
-					voxelGrid.SetVoxelIsFilled(voxelGrid.GetVoxelGridDimensions().x / 2, y, z, isFilled: false);
-
-					int index = VoxelGrid.CoordsToIndex(voxelGrid.GetVoxelGridDimensions().x / 2, y, z, voxelGrid.GetVoxelGridDimensions());
+					Vector3Int coords = new Vector3Int(voxelGrid.GetVoxelGridDimensions().x / 2, y, z);
+					int index = VoxelGrid.CoordsToIndex(coords, voxelGrid.GetVoxelGridDimensions());
+					
 					voxelGrid.SetVoxelIsFilled(index, false);
                 }
             }
@@ -106,7 +98,13 @@ public class VoxelController : MonoBehaviour {
 
 		Bounds b = new Bounds(Vector3.zero, Vector3.one);
 		for(int i = 0; i < voxelGrid.GetVoxelCount(); i++) {
-			Voxel voxel = voxelGrid.GetVoxel(i);
+			Voxel voxel;
+
+			Vector3Int coords = VoxelGrid.IndexToCoords(i, voxelGrid.GetVoxelGridDimensions());
+			if(!voxelGrid.TryGetVoxel(coords.x, coords.y, coords.z, out voxel)) {
+				Debug.LogError("Something went wrong!");
+				continue;
+            }
 
 			if(!voxel.IsFilled) {
 				continue;
@@ -143,20 +141,20 @@ public class VoxelController : MonoBehaviour {
     }
 
 	private void OnVoxelUpdated(int index) {
-		Vector3Int coords = VoxelGrid.IndexToCoords(index, voxelGrid.GetVoxelGridDimensions());
+		Vector3Int dimensions = voxelGrid.GetVoxelGridDimensions();
+		Vector3Int coords = VoxelGrid.IndexToCoords(index, dimensions);
 
-		TrySetVoxelDirty(coords);
-		TrySetVoxelDirty(coords + Vector3Int.right);
-		TrySetVoxelDirty(coords + Vector3Int.left);
-		TrySetVoxelDirty(coords + Vector3Int.up);
-		TrySetVoxelDirty(coords + Vector3Int.down);
-		TrySetVoxelDirty(coords + Vector3Int.forward);
-		TrySetVoxelDirty(coords + Vector3Int.back);
+		TrySetVoxelDirty(coords.x + 1, coords.y, coords.z);
+		TrySetVoxelDirty(coords.x - 1, coords.y, coords.z);
+		TrySetVoxelDirty(coords.x, coords.y + 1, coords.z);
+		TrySetVoxelDirty(coords.x, coords.y - 1, coords.z);
+		TrySetVoxelDirty(coords.x, coords.y, coords.z + 1);
+		TrySetVoxelDirty(coords.x, coords.y, coords.z - 1);
 	}
 
-	private void TrySetVoxelDirty(Vector3Int coords) {
+	private void TrySetVoxelDirty(int x, int y, int z) {
 		Voxel v;
-        if(!Voxel.TryGetVoxel(coords, voxelGrid, out v)) {
+        if(!voxelGrid.TryGetVoxel(x, y, z, out v)) {
 			return;
         }
 
@@ -164,8 +162,7 @@ public class VoxelController : MonoBehaviour {
 			return;
 		}
 
-		int index = VoxelGrid.CoordsToIndex(coords, voxelGrid.GetVoxelGridDimensions());
-
+		int index = VoxelGrid.CoordsToIndex(x, y, z, voxelGrid.GetVoxelGridDimensions());
 		if(dirtyVoxels.Contains(index)) {
 			return;
 		}
@@ -185,7 +182,31 @@ public class VoxelController : MonoBehaviour {
             timeToUpdate = Time.time + UPDATE_LATENCY;
         }
 
-		List<VoxelCluster> clusters = voxelGrid.FindVoxelClusters(startingPoints: dirtyVoxels);
+		UpdateDirtyVoxels();
+	}
+
+	private void UpdateDirtyVoxels() {
+		List<VoxelCluster> clusters = new List<VoxelCluster>();
+		bool[] visitedVoxels = new bool[voxelGrid.GetVoxelCount()]; // TODO: if I cached how many voxels have been visited, we could just break the loop when that number is reached, thus potentially saving a bunch of iterating
+
+		Queue<int> dirtyVoxelsContinued = new Queue<int>();
+		
+		while(dirtyVoxels.Count > 0) {
+			int index = dirtyVoxels.Dequeue();
+			dirtyVoxelsContinued.Enqueue(index);
+
+			voxelGrid.RefreshVoxelHasNeighborValues(index);
+		}
+
+		while(dirtyVoxelsContinued.Count > 0) {
+			int index = dirtyVoxelsContinued.Dequeue();
+
+			VoxelCluster cluster;
+			if(voxelGrid.TryFindVoxelCluster(index, visitedVoxels, out cluster)) {
+				clusters.Add(cluster);
+			}
+		}
+
 		ApplyClustersToVoxelControllers(clusters, this);
 
 		Debug.Assert(dirtyVoxels.Count == 0);
@@ -230,14 +251,14 @@ public class VoxelController : MonoBehaviour {
 			
 			VoxelController voxelController = go.GetComponent<VoxelController>();
 			voxelController.isOriginal = false;
-			voxelController.TrySetupDependencies();
+			//voxelController.meshTransform = TryGetNewMeshTransform(voxelController.transform);
 
 			VoxelCluster cluster = clusters[i0];
 			voxelController.ApplySettings(cluster.Voxels, cluster.Dimensions, cluster.Offset, ShouldClusterBeStatic(caller.isStatic, cluster.Offset));
 		}
 
 		VoxelCluster biggestCluster = clusters[biggestClusterIndex];
-		caller.ApplySettings(biggestCluster.Voxels, biggestCluster.Dimensions, biggestCluster.Offset, ShouldClusterBeStatic(caller.isStatic, biggestCluster.Offset)); // TODO: currently all clusters will discard all meshobjects every time and rebuild from scratch - might be nice to have the biggest cluster use the old approach of only discarding what we don't need
+		caller.ApplySettings(biggestCluster.Voxels, biggestCluster.Dimensions, biggestCluster.Offset, ShouldClusterBeStatic(caller.isStatic, biggestCluster.Offset));
 	}
 
 	private static bool ShouldClusterBeStatic(bool wasOriginallyStatic, Vector3Int offset) {
@@ -258,7 +279,7 @@ public class VoxelController : MonoBehaviour {
         transform.position = meshTransform.position + GetLocalPosWithWorldRotation(pivot, meshTransform);
         meshTransform.parent = transform;
 
-        voxelGrid.ApplySettings(voxels, dimensions, offset, isOriginalSetup);
+        voxelGrid.ApplySettings(voxels, dimensions, isOriginalSetup);
     }
 
 	private static Vector3 GetPivot(Voxel[] voxels, Vector3Int dimensions, bool isStatic) {
@@ -271,7 +292,7 @@ public class VoxelController : MonoBehaviour {
 				continue;
 			}
 
-			Vector3Int coords = VoxelGrid.IndexToCoords(v.Index, dimensions);
+			Vector3Int coords = v.Coords;// VoxelGrid.IndexToCoords(v.Index, dimensions);
 
 			if(!isStatic || coords.y == 0) {
 				pivot += coords;
@@ -291,24 +312,10 @@ public class VoxelController : MonoBehaviour {
 		return pivot;
 	}
 
-	public Vector3 GetVoxelLocalPos(int index) {
-		return VoxelGrid.IndexToCoords(index, voxelGrid.GetVoxelGridDimensions());
-	}
-
 	public Vector3 GetVoxelWorldPos(int index) {
-		return meshTransform.TransformPoint(GetVoxelLocalPos(index));
-	}
-
-	public Material GetMaterial() {
-		return material;
-	}
-
-	public Color GetColor() {
-		return color;
-	}
-
-	public Transform GetMeshTransform() {
-		return meshTransform;
+		Vector3 localPos = VoxelGrid.IndexToCoords(index, voxelGrid.GetVoxelGridDimensions());
+		Vector3 worldPos = meshTransform.TransformPoint(localPos);
+		return worldPos;
 	}
 
 	public static void RunTests() {
@@ -322,9 +329,10 @@ public class VoxelController : MonoBehaviour {
 		for(int z = 0; z < dimensions.z; z++) {
 			for(int y = 0; y < dimensions.y; y++) {
 				for(int x = 0; x < dimensions.x; x++) {
-					int i = VoxelGrid.CoordsToIndex(x, y, z, dimensions);
+					Vector3Int coords = new Vector3Int(x, y, z);
+					int i = VoxelGrid.CoordsToIndex(coords, dimensions);
 					bool isFilled = x == 0 || y == 0 || z == 0 || x == dimensions.x - 1 || y == dimensions.y - 1 || z == dimensions.z - 1;
-					cluster[i] = new Voxel(i, isFilled, false, false, false, false, false, false);
+					cluster[i] = new Voxel(i, coords, isFilled, false, false, false, false, false, false);
 				}
 			}
 		}

@@ -25,11 +25,6 @@ public class UnitTester : MonoBehaviour
     }
 
     [EasyButtons.Button]
-    public void TestVoxelBuilder() {
-        VoxelBuilder.RunTests();
-    }
-
-    [EasyButtons.Button]
     public void TestVoxelMeshFactory() {
         VoxelMeshFactory.RunTests();
     }

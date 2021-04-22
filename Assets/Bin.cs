@@ -6,66 +6,81 @@ public readonly struct Bin {
     public const int SIZE = 8; // must be WIDTH ^ 3
 
     public readonly int Index;
-    public readonly Vector3Int VoxelGridDimensions;
 
-    public Bin(int index, Vector3Int voxelGridDimensions) {
+    public Bin(int index) {
         Index = index;
-        VoxelGridDimensions = voxelGridDimensions;
     }
 
-    public Vector3Int[] GetContentCoords() {
-        return GetContentCoords(Index, VoxelGridDimensions);
+    public static Voxel?[] GetBinVoxels(int binIndex, VoxelGrid owner) {
+        Voxel?[] voxels = new Voxel?[SIZE];
+
+        Vector3Int[] binContents = GetContents(binIndex, owner.GetVoxelGridDimensions());
+        for(int i = 0; i < binContents.Length; i++) {
+            Vector3Int coords = binContents[i];
+
+            Voxel v;
+            if(owner.TryGetVoxel(coords.x, coords.y, coords.z, out v)) {
+                voxels[i] = v;
+            }
+            else {
+                voxels[i] = null;
+            }
+        }
+
+        return voxels;
     }
 
-    public static Vector3Int[] GetContentCoords(int index, Vector3Int voxelGridDimensions) {
+    public static Vector3Int[] GetContents(int index, Vector3Int voxelGridDimensions) {
         Vector3Int binCoords = VoxelGrid.IndexToCoords(index, VoxelGrid.CalculateBinGridDimensions(voxelGridDimensions));
         Vector3Int voxelCoords_0 = binCoords * WIDTH;
 
+        return GetContentsLocalCoords(offset: voxelCoords_0);
+    }
+
+    public static Vector3Int[] GetContentsLocalCoords(Vector3Int offset) {
         return new Vector3Int[] { // TODO: this doesn't support any other width than 2!
-                voxelCoords_0,
-                voxelCoords_0 + new Vector3Int(1, 0, 0),
-                voxelCoords_0 + new Vector3Int(0, 1, 0),
-                voxelCoords_0 + new Vector3Int(1, 1, 0),
-                voxelCoords_0 + new Vector3Int(0, 0, 1),
-                voxelCoords_0 + new Vector3Int(1, 0, 1),
-                voxelCoords_0 + new Vector3Int(0, 1, 1),
-                voxelCoords_0 + new Vector3Int(1, 1, 1)
-            };
+            new Vector3Int(offset.x,        offset.y,       offset.z),
+            new Vector3Int(offset.x + 1,    offset.y,       offset.z),
+            new Vector3Int(offset.x,        offset.y + 1,   offset.z),
+            new Vector3Int(offset.x + 1,    offset.y + 1,   offset.z),
+            new Vector3Int(offset.x,        offset.y,       offset.z + 1),
+            new Vector3Int(offset.x + 1,    offset.y,       offset.z + 1),
+            new Vector3Int(offset.x,        offset.y + 1,   offset.z + 1),
+            new Vector3Int(offset.x + 1,    offset.y + 1,   offset.z + 1)
+        };
     }
 
     public static void RunTests() {
-        TestGetContentCoords();
+        TestGetContents();
     }
 
-    private static void TestGetContentCoords() {
+    private static void TestGetContents() {
         Vector3Int voxelGridDimensions = new Vector3Int(16, 16, 16);
         Vector3Int binGridDimensions = VoxelGrid.CalculateBinGridDimensions(voxelGridDimensions);
 
         List<Vector3Int> foundContents = new List<Vector3Int>();
 
-        Debug.LogFormat("GetContentIndexes Results (Bin Grid Dimensions = {0}):", binGridDimensions);
-        for(int z = 0; z < binGridDimensions.z; z++) {
-            for(int y = 0; y < binGridDimensions.y; y++) {
-                for(int x = 0; x < binGridDimensions.x; x++) {
-                    int binIndex = VoxelGrid.CoordsToIndex(x, y, z, binGridDimensions);
-                    Vector3Int[] binContents = GetContentCoords(binIndex, voxelGridDimensions);
-                    
-                    string results = "";
-                    for(int i = 0; i < binContents.Length; i++) {
-                        Vector3Int content = binContents[i];
-                        results += content.ToString();
+        Debug.LogFormat("GetContentIndexes Results (Voxel Grid Dimensions = {0}):", voxelGridDimensions);
 
-                        if(i < binContents.Length - 1) {
-                            results += ", ";
-                        }
+        int binCount = binGridDimensions.x * binGridDimensions.y * binGridDimensions.z;
 
-                        Debug.Assert(!foundContents.Contains(content));
-                        foundContents.Add(content);
-                    }
+        for(int binIndex = 0; binIndex < binCount; binIndex++) {
+            Vector3Int[] binContents = GetContents(binIndex, voxelGridDimensions);
 
-                    Debug.LogFormat("{0} contains {1}", binIndex, results);
+            string results = "";
+            for(int contentIndex = 0; contentIndex < binContents.Length; contentIndex++) {
+                Vector3Int content = binContents[contentIndex];
+                results += content.ToString();
+
+                if(contentIndex < binContents.Length - 1) {
+                    results += ", ";
                 }
+
+                Debug.Assert(!foundContents.Contains(content));
+                foundContents.Add(content);
             }
+
+            Debug.LogFormat("{0} contains {1}", binIndex, results);
         }
     }
 }
