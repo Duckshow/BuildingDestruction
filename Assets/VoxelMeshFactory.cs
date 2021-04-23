@@ -122,7 +122,7 @@ public static class VoxelMeshFactory
 		int faceIndex = 0;
 		int triIndex = 0;
 
-		Vector3Int[] voxelLocalCoords = Bin.GetContentsLocalCoords(Vector3Int.zero);
+		Vector3Int[] voxelLocalCoords = Bin.GetContentsLocalCoords();
 
 		for(int i = 0; i < binVoxels.Length; i++) {
 			if(!binVoxels[i].HasValue) {
@@ -223,6 +223,7 @@ public static class VoxelMeshFactory
 	public static void RunTests() {
 		TestGetMesh();
 		TestGetID();
+		Debug.Log("Tests done.");
 	}
 
 	private static void TestGetMesh() {

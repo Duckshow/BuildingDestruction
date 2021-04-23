@@ -4,8 +4,6 @@ using UnityEngine;
 [RequireComponent(typeof(VoxelGrid), typeof(Rigidbody))]
 public class VoxelController : MonoBehaviour {
 
-	private static bool DEBUG = false;
-
 	[SerializeField] private Transform meshTransform;
 	[SerializeField, HideInInspector] private bool isOriginal = true;
 
@@ -14,6 +12,7 @@ public class VoxelController : MonoBehaviour {
 
 	private bool isStatic;
 	private Queue<int> dirtyVoxels = new Queue<int>();
+	private Queue<int> dirtyBins = new Queue<int>();
 
 	private const float UPDATE_LATENCY = 0.1f;
 	private float timeToUpdate;
@@ -38,7 +37,7 @@ public class VoxelController : MonoBehaviour {
 				voxels[i] = new Voxel(i, VoxelGrid.IndexToCoords(i, dimensions));
             }
 
-			ApplySettings(voxels, dimensions, offset: Vector3Int.zero, isStatic: true, isOriginalSetup: true);
+			ApplySettings(voxels, bins: null, dimensions, offset: Vector3Int.zero, isStatic: true, isOriginalSetup: true);
 
 			for(int i = 0; i < voxels.Length; i++) {
 				voxelGrid.SetVoxelIsFilled(i, true);
@@ -183,50 +182,72 @@ public class VoxelController : MonoBehaviour {
         }
 
 		UpdateDirtyVoxels();
+		UpdateDirtyBins();
 	}
 
 	private void UpdateDirtyVoxels() {
-		List<VoxelCluster> clusters = new List<VoxelCluster>();
-		bool[] visitedVoxels = new bool[voxelGrid.GetVoxelCount()]; // TODO: if I cached how many voxels have been visited, we could just break the loop when that number is reached, thus potentially saving a bunch of iterating
-
-		Queue<int> dirtyVoxelsContinued = new Queue<int>();
-		
 		while(dirtyVoxels.Count > 0) {
 			int index = dirtyVoxels.Dequeue();
-			dirtyVoxelsContinued.Enqueue(index);
+
+			int binIndex = VoxelGrid.VoxelToBinIndex(index, voxelGrid.GetVoxelGridDimensions());
+			if(!dirtyBins.Contains(binIndex)) {
+				dirtyBins.Enqueue(binIndex);
+			}
 
 			voxelGrid.RefreshVoxelHasNeighborValues(index);
 		}
 
-		while(dirtyVoxelsContinued.Count > 0) {
-			int index = dirtyVoxelsContinued.Dequeue();
+		Debug.Assert(dirtyVoxels.Count == 0);
+	}
+
+	private void UpdateDirtyBins() {
+		List<VoxelCluster> clusters = new List<VoxelCluster>();
+		bool[] visitedBins = new bool[voxelGrid.GetVoxelCount()]; // TODO: if I cached how many voxels have been visited, we could just break the loop when that number is reached, thus potentially saving a bunch of iterating
+
+		Queue<int> dirtyBinsLoop2 = new Queue<int>();
+		Queue<int> dirtyBinsLoop3 = new Queue<int>();
+
+		while(dirtyBins.Count > 0) {
+			int binIndex = dirtyBins.Dequeue();
+			dirtyBinsLoop2.Enqueue(binIndex);
+
+			voxelGrid.RefreshBinHasVoxelValues(binIndex);
+		}
+
+        while(dirtyBinsLoop2.Count > 0) {
+			int binIndex = dirtyBinsLoop2.Dequeue();
+			dirtyBinsLoop3.Enqueue(binIndex);
+		
+			voxelGrid.RefreshBinHasConnectionValues(binIndex);
+		}
+
+		while(dirtyBinsLoop3.Count > 0) {
+			int binIndex = dirtyBinsLoop3.Dequeue();
 
 			VoxelCluster cluster;
-			if(voxelGrid.TryFindVoxelCluster(index, visitedVoxels, out cluster)) {
+			if(voxelGrid.TryFindVoxelCluster(binIndex, visitedBins, out cluster)) {
 				clusters.Add(cluster);
 			}
 		}
 
 		ApplyClustersToVoxelControllers(clusters, this);
 
-		Debug.Assert(dirtyVoxels.Count == 0);
+		Debug.Assert(dirtyBins.Count == 0);
 	}
 
 	private static void ApplyClustersToVoxelControllers(List<VoxelCluster> clusters, VoxelController caller) { // TODO: very strange having a static method that just gets the instance as a parameter - like why even be static then? figure out something better.
 		Debug.Assert(clusters.Count > 0);
 
-        if(DEBUG) {
-			if(clusters.Count > 1) {
-				Debug.LogFormat("==========SPLIT: {0}==========", clusters.Count);
-				for(int i = 0; i < clusters.Count; i++) {
-					VoxelCluster cluster = clusters[i];
-					Vector3Int voxelGridDimensions = cluster.Dimensions;
-					Vector3Int binGridDimensions = VoxelGrid.CalculateBinGridDimensions(voxelGridDimensions);
+		if(clusters.Count > 1) {
+			Debug.LogFormat("==========SPLIT: {0}==========", clusters.Count);
+			for(int i = 0; i < clusters.Count; i++) {
+				VoxelCluster cluster = clusters[i];
+				Vector3Int voxelGridDimensions = cluster.Dimensions;
+				Vector3Int binGridDimensions = VoxelGrid.CalculateBinGridDimensions(voxelGridDimensions);
 
-					Debug.LogFormat("Cluster #{0}: Voxels: {1}, Bins: {2}, Offset: {3}", i, voxelGridDimensions, binGridDimensions, cluster.Offset);
-				}
-				Debug.LogFormat("==============================");
+				Debug.LogFormat("Cluster #{0}: Voxels: {1}, Bins: {2}, Offset: {3}", i, voxelGridDimensions, binGridDimensions, cluster.Offset);
 			}
+			Debug.LogFormat("==============================");
 		}
 
 		int biggestClusterIndex = VoxelGrid.GetBiggestVoxelClusterIndex(clusters);
@@ -265,10 +286,10 @@ public class VoxelController : MonoBehaviour {
 		return wasOriginallyStatic && offset.y == 0;
 	}
 
-	private void ApplySettings(Voxel[] voxels, Vector3Int dimensions, Vector3Int offset, bool isStatic, bool isOriginalSetup = false) {
+	private void ApplySettings(Voxel[] voxels, Bin[] bins, Vector3Int voxelGridDimensions, Vector3Int offset, bool isStatic, bool isOriginalSetup = false) {
 		this.isStatic = isStatic;
 
-		Vector3 pivot = GetPivot(voxels, dimensions, isStatic);
+		Vector3 pivot = GetPivot(voxels, voxelGridDimensions, isStatic);
 
 		Vector3 GetLocalPosWithWorldRotation(Vector3 localPos, Transform t) {
 			return (t.TransformPoint(localPos) - t.position);
@@ -279,7 +300,7 @@ public class VoxelController : MonoBehaviour {
         transform.position = meshTransform.position + GetLocalPosWithWorldRotation(pivot, meshTransform);
         meshTransform.parent = transform;
 
-        voxelGrid.ApplySettings(voxels, dimensions, isOriginalSetup);
+        voxelGrid.ApplySettings(voxels, bins, voxelGridDimensions, isOriginalSetup);
     }
 
 	private static Vector3 GetPivot(Voxel[] voxels, Vector3Int dimensions, bool isStatic) {
@@ -320,6 +341,7 @@ public class VoxelController : MonoBehaviour {
 
 	public static void RunTests() {
 		TestGetPivot();
+		Debug.Log("Tests done.");
 	}
 
 	private static void TestGetPivot() {

@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 public class VoxelCluster {
+
 	public Voxel[] Voxels { get; private set; }
 	public Vector3Int Offset { get; private set; }
 	public Vector3Int Dimensions { get; private set; }
@@ -10,122 +11,91 @@ public class VoxelCluster {
 		Voxels = new Voxel[length]; // only for unit-testing purposes!
 	}
 
-	public VoxelCluster(Voxel startVoxel, Voxel[] grid, Vector3Int gridDimensions, bool[] visitedVoxels) {
+	public VoxelCluster(int startBinIndex, Bin[] bins, Voxel[] voxels, Vector3Int binGridDimensions, Vector3Int voxelGridDimensions, bool[] visitedBins) {
 		Vector3Int newDimensions;
-		Vector3Int offset;
-		bool isTouchingGround;
-		Voxels = FindVoxels(startVoxel, grid, gridDimensions, visitedVoxels, out newDimensions, out offset, out isTouchingGround);
-
-		Offset = offset;
+		Vector3Int minCoord, maxCoord;
+		Queue<int> foundBins = FindCluster(startBinIndex, bins, binGridDimensions, visitedBins, out minCoord, out maxCoord);
+		
+		Voxels = MoveVoxelsToNewGrid(voxels, voxelGridDimensions, foundBins, minCoord, maxCoord, out newDimensions);
+		Offset = minCoord;
 		Dimensions = newDimensions;
+
+		//bool isTouchingGround = minCoord.y == 0;
 	}
 
-	private static Voxel[] FindVoxels(Voxel startVoxel, Voxel[] grid, Vector3Int dimensions, bool[] visitedVoxels, out Vector3Int newDimensions, out Vector3Int offset, out bool isTouchingGround) {
-		Vector3Int minCoord = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
-		Vector3Int maxCoord = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
+	private static Queue<int> FindCluster(int startBinIndex, Bin[] bins, Vector3Int binGridDimensions, bool[] visitedBins, out Vector3Int minCoord, out Vector3Int maxCoord) {
+		minCoord = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
+		maxCoord = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
 
-		Queue<int> q1 = new Queue<int>();
-		Queue<int> q2 = new Queue<int>();
+		Queue<int> binQueue = new Queue<int>();
+		Queue<int> foundBinQueue = new Queue<int>();
+		
+		binQueue.Enqueue(startBinIndex);
 
-		q1.Enqueue(startVoxel.Index);
-
-		while(q1.Count > 0) {
-			EvaluateNextVoxel(grid, q1, q2, visitedVoxels, dimensions, ref minCoord, ref maxCoord);
+		while(binQueue.Count > 0) {
+			EvaluateNextBin(bins, binGridDimensions, binQueue, foundBinQueue, visitedBins, ref minCoord, ref maxCoord);
 		}
 
+		return foundBinQueue;
+	}
+
+	private static void EvaluateNextBin(Bin[] bins, Vector3Int binGridDimensions, Queue<int> binQueue, Queue<int> foundBins, bool[] visitedBins, ref Vector3Int minCoord, ref Vector3Int maxCoord) {
+		int index = binQueue.Dequeue();
+		Bin bin = bins[index];
+		
+		if(!bin.HasVoxelRight && !bin.HasVoxelLeft && !bin.HasVoxelUp && !bin.HasVoxelDown && !bin.HasVoxelFore && !bin.HasVoxelBack) {
+			return;
+		}
+
+        if(visitedBins[index]) {
+			return;
+		}
+		visitedBins[index] = true;
+
+		Vector3Int minVoxelCoords = Bin.GetMinVoxelCoords(bin.Coords);
+		Vector3Int maxVoxelCoords = Bin.GetMaxVoxelCoords(bin.Coords);
+		minCoord.x = Mathf.Min(minCoord.x, minVoxelCoords.x);
+		minCoord.y = Mathf.Min(minCoord.y, minVoxelCoords.y);
+		minCoord.z = Mathf.Min(minCoord.z, minVoxelCoords.z);
+		maxCoord.x = Mathf.Max(maxCoord.x, maxVoxelCoords.x);
+		maxCoord.y = Mathf.Max(maxCoord.y, maxVoxelCoords.y);
+		maxCoord.z = Mathf.Max(maxCoord.z, maxVoxelCoords.z);
+
+		foundBins.Enqueue(index);
+
+		if(bin.HasConnectionRight)	binQueue.Enqueue(VoxelGrid.CoordsToIndex(bin.Coords.x + 1, bin.Coords.y, bin.Coords.z, binGridDimensions));
+		if(bin.HasConnectionLeft)	binQueue.Enqueue(VoxelGrid.CoordsToIndex(bin.Coords.x - 1, bin.Coords.y, bin.Coords.z, binGridDimensions));
+		if(bin.HasConnectionUp)		binQueue.Enqueue(VoxelGrid.CoordsToIndex(bin.Coords.x, bin.Coords.y + 1, bin.Coords.z, binGridDimensions));
+		if(bin.HasConnectionDown)	binQueue.Enqueue(VoxelGrid.CoordsToIndex(bin.Coords.x, bin.Coords.y - 1, bin.Coords.z, binGridDimensions));
+		if(bin.HasConnectionFore)	binQueue.Enqueue(VoxelGrid.CoordsToIndex(bin.Coords.x, bin.Coords.y, bin.Coords.z + 1, binGridDimensions));
+		if(bin.HasConnectionBack)	binQueue.Enqueue(VoxelGrid.CoordsToIndex(bin.Coords.x, bin.Coords.y, bin.Coords.z - 1, binGridDimensions));
+	}
+
+	private static T[] MoveToNewGrid<T>(T[] oldGrid, Vector3Int oldDimensions, Queue<int> indexesToMove, Vector3Int minCoord, Vector3Int maxCoord, out Vector3Int newDimensions) {
 		newDimensions = maxCoord - minCoord + Vector3Int.one;
-		Voxel[] newVoxels = new Voxel[newDimensions.x * newDimensions.y * newDimensions.z];
+		T[] newObjs = new T[newDimensions.x * newDimensions.y * newDimensions.z];
 
-		while(q2.Count > 0) {
-			int oldVoxel = q2.Dequeue();
-			Voxel newVoxel = AdjustVoxelIndex(grid[oldVoxel], minCoord, dimensions, newDimensions);
-			newVoxels[newVoxel.Index] = newVoxel;
+		while(indexesToMove.Count > 0) {
+			int moveIndex = indexesToMove.Dequeue();
+
+			int newIndex;
+			Vector3Int newCoords;
+			GetIndexAndCoordsInNewGrid(VoxelGrid.IndexToCoords(moveIndex, oldDimensions), newGridOffset: minCoord, newDimensions, out newIndex, out newCoords);
+
+			newObjs[newIndex] = newObject;
 		}
 
-		offset = minCoord;
-		isTouchingGround = minCoord.y == 0;
-
-		return newVoxels;
+		return newObjs;
 	}
 
-	private static void EvaluateNextVoxel(Voxel[] grid, Queue<int> q1, Queue<int> q2, bool[] visitedVoxels, Vector3Int dimensions, ref Vector3Int minCoord, ref Vector3Int maxCoord) {
-		int index = q1.Dequeue();
-
-		if(visitedVoxels[index]) {
-			return;
-		}
-
-		visitedVoxels[index] = true;
-
-		Voxel v = grid[index];
-		if(!v.IsFilled) {
-			return;
-		}
-
-		q2.Enqueue(index);
-
-		Vector3Int coords = v.Coords; //VoxelGrid.IndexToCoords(index, dimensions);
-		minCoord.x = Mathf.Min(minCoord.x, coords.x);
-		minCoord.y = Mathf.Min(minCoord.y, coords.y);
-		minCoord.z = Mathf.Min(minCoord.z, coords.z);
-		maxCoord.x = Mathf.Max(maxCoord.x, coords.x);
-		maxCoord.y = Mathf.Max(maxCoord.y, coords.y);
-		maxCoord.z = Mathf.Max(maxCoord.z, coords.z);
-
-		if(v.HasNeighborRight)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x + 1, coords.y, coords.z, dimensions));
-		if(v.HasNeighborLeft)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x - 1, coords.y, coords.z, dimensions));
-		if(v.HasNeighborUp)		q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x, coords.y + 1, coords.z, dimensions));
-		if(v.HasNeighborDown)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x, coords.y - 1, coords.z, dimensions));
-		if(v.HasNeighborFore)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x, coords.y, coords.z + 1, dimensions));
-		if(v.HasNeighborBack)	q1.Enqueue(VoxelGrid.CoordsToIndex(coords.x, coords.y, coords.z - 1, dimensions));
-	}
-
-	private static Voxel AdjustVoxelIndex(Voxel v, Vector3Int minCoord, Vector3Int oldDimensions, Vector3Int newDimensions) {
-		//Vector3Int oldCoords = VoxelGrid.IndexToCoords(v.Index, oldDimensions);
-        Vector3Int newCoords = v.Coords - minCoord;
-        int newIndex = VoxelGrid.CoordsToIndex(newCoords, newDimensions);
-
-        return new Voxel(newIndex, newCoords, v);
+	private static void GetIndexAndCoordsInNewGrid(Vector3Int coords, Vector3Int newGridOffset, Vector3Int newDimensions, out int newIndex, out Vector3Int newCoords) {
+        newCoords = coords - newGridOffset;
+        newIndex = VoxelGrid.CoordsToIndex(newCoords, newDimensions);
     }
 
 	public static void RunTests() {
-		TestEvaluateNextVoxel();
 		TestAdjustVoxelIndex();
-	}
-
-	private static void TestEvaluateNextVoxel() {
-		Vector3Int dimensions = new Vector3Int(8, 8, 8);
-		Voxel[] grid = new Voxel[dimensions.x * dimensions.y * dimensions.z];
-
-		Queue<int> q1 = new Queue<int>();
-		Queue<int> q2 = new Queue<int>();
-		bool[] visitedVoxels = new bool[dimensions.x * dimensions.y * dimensions.z];
-		Vector3Int minCoord = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
-		Vector3Int maxCoord = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
-
-		q1.Enqueue(0);
-
-		while(q1.Count > 0) {
-			int index = q1.Peek(); // dequeued inside EvaluateNextVoxel
-			Vector3Int coords = VoxelGrid.IndexToCoords(index, dimensions);
-
-			grid[index] = new Voxel(
-				index, 
-				coords,
-				isFilled: true, 
-				hasNeighborRight: coords.x < dimensions.x - 1, 
-				hasNeighborLeft: coords.x > 0, 
-				hasNeighborUp: coords.y < dimensions.y - 1, 
-				hasNeighborDown: coords.y > 0, 
-				hasNeighborFore: coords.z < dimensions.z - 1, 
-				hasNeighborBack: coords.z > 0
-			);
-
-			EvaluateNextVoxel(grid, q1, q2, visitedVoxels, dimensions, ref minCoord, ref maxCoord);
-			Debug.Assert(visitedVoxels[index]);
-		}
-
-		Debug.LogFormat("EvaluateNextVoxel Result = Grid Dimensions: {0}, MinCoord: {1}, MaxCoord: {2}", dimensions, minCoord, maxCoord);
+		Debug.Log("Run tests.");
 	}
 
 	private static void TestAdjustVoxelIndex() {

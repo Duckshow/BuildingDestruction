@@ -1,1 +1,1 @@
-public enum Direction { Right, Left, Up, Down, Fore, Back }
+public enum Direction { None, Right, Left, Up, Down, Fore, Back }

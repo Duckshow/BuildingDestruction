@@ -35,11 +35,16 @@ public class VoxelBuilder : MonoBehaviour {
 		int newMeshObjectCount = newDimensions.x * newDimensions.y * newDimensions.z;
 		Mesh[] meshes = new Mesh[newMeshObjectCount];
 
-		for(int i = 0; i < newMeshObjectCount; i++) {
-			Voxel?[] binVoxels = Bin.GetBinVoxels(i, voxelGrid);
+		for(int i0 = 0; i0 < newMeshObjectCount; i0++) {
+			int[] voxelIndexes = voxelGrid.GetBinUnsafe(i0).VoxelIndexes;
+			Voxel?[] voxels = new Voxel?[voxelIndexes.Length];
 
-			if(VoxelMeshFactory.TryGetMesh(i, binVoxels, out meshes[i]) && meshObjects[i] == null) {
-				meshObjects[i] = Instantiate(meshObjectPrefab, meshTransform).GetComponent<MeshObject>();
+            for(int i1 = 0; i1 < voxelIndexes.Length; i1++) {
+				voxels[i1] = voxelGrid.TryGetVoxelUnsafe(i1);
+			}
+
+			if(VoxelMeshFactory.TryGetMesh(i0, voxels, out meshes[i0]) && meshObjects[i0] == null) {
+				meshObjects[i0] = Instantiate(meshObjectPrefab, meshTransform).GetComponent<MeshObject>();
 			}
 		}
 
