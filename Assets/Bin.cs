@@ -143,9 +143,6 @@ public readonly struct Voxel {
     public readonly int LocalIndex;
     public readonly Vector3Int LocalCoords;
     
-    public readonly int GlobalIndex;
-    public readonly Vector3Int GlobalCoords;
-
     public readonly bool IsFilled;
 
     public Voxel(Bin ownerBin, int localIndex, Vector3Int voxelGridDimensions, bool isFilled = false) {
@@ -153,9 +150,6 @@ public readonly struct Voxel {
 
         LocalIndex = localIndex;
         LocalCoords = VoxelGrid.IndexToCoords(LocalIndex, width: Bin.WIDTH);
-
-        GlobalCoords = OwnerBin.Coords * Bin.WIDTH + LocalCoords;
-        GlobalIndex = VoxelGrid.CoordsToIndex(GlobalCoords, voxelGridDimensions);
 
         IsFilled = isFilled;
     }
@@ -166,10 +160,15 @@ public readonly struct Voxel {
         LocalIndex = v.LocalIndex;
         LocalCoords = v.LocalCoords;
 
-        GlobalIndex = v.GlobalIndex;
-        GlobalCoords = v.GlobalCoords;
-
         IsFilled = isFilled;
+    }
+
+    public Vector3 GetWorldPos(Transform meshTransform) {
+        return meshTransform.TransformPoint(GetGlobalCoords());
+    }
+
+    public Vector3 GetGlobalCoords() {
+        return OwnerBin.Coords * Bin.WIDTH + LocalCoords;
     }
 }
 

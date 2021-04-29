@@ -57,6 +57,10 @@ public class VoxelCluster {
 			return;
         }
 
+		if(visitedBins[binIndex]) {
+			return;
+		}
+
 		Bin bin = bins[binIndex];
         if(bin == null) {
 			return;
@@ -71,12 +75,7 @@ public class VoxelCluster {
 			return;
         }
 
-		if(visitedBins[binIndex]) {
-			return;
-		}
 		visitedBins[binIndex] = true;
-
-
 		foundBinQueue.Enqueue(binIndex);
 
 		Vector3Int binCoords = VoxelGrid.IndexToCoords(binIndex, binGridDimensions);
@@ -125,70 +124,17 @@ public class VoxelCluster {
 		Bin[] newBins = new Bin[newBinGridDimensions.x * newBinGridDimensions.y * newBinGridDimensions.z];
 
 		while(indexesToMove.Count > 0) {
-			int moveIndex = indexesToMove.Dequeue();
-
-			int newIndex;
-			Vector3Int newCoords;
-			GetIndexAndCoordsInNewGrid(VoxelGrid.IndexToCoords(moveIndex, oldBinGridDimensions), newGridOffset: minCoord, newBinGridDimensions, out newIndex, out newCoords);
-
-			newBins[newIndex] = new Bin(newIndex, newBinGridDimensions, oldBins[moveIndex]);
+			int oldBinIndex = indexesToMove.Dequeue();
+			int newBinIndex = GetIndexInNewGrid(oldBinIndex, minCoord, oldBinGridDimensions, newBinGridDimensions);
+			
+			newBins[newBinIndex] = new Bin(newBinIndex, newBinGridDimensions, oldBins[oldBinIndex]);
 		}
 
 		return newBins;
 	}
 
-	private static void GetIndexAndCoordsInNewGrid(Vector3Int coords, Vector3Int newGridOffset, Vector3Int newDimensions, out int newIndex, out Vector3Int newCoords) {
-        newCoords = coords - newGridOffset;
-		
-		if(!VoxelGrid.AreCoordsWithinDimensions(newCoords, newDimensions)) {
-			newCoords = -Vector3Int.one;
-			newIndex = -1;
-			return;
-        }
-
-        newIndex = VoxelGrid.CoordsToIndex(newCoords, newDimensions);
-    }
-
-	public static void RunTests() {
-		TestGetIndexAndCoordsInNewGrid();
-	}
-
-	private static void TestGetIndexAndCoordsInNewGrid() {
-		Debug.Log("== Testing GetIndexAndCoordsInNewGrid() ==");
-
-		for(int i = 0; i < 100; i++) {
-			Vector3Int oldDimensions = new Vector3Int(Random.Range(2, 10), Random.Range(2, 10), Random.Range(2, 10));
-			Vector3Int newDimensions = new Vector3Int(Random.Range(1, oldDimensions.x), Random.Range(1, oldDimensions.y), Random.Range(1, oldDimensions.z));
-			Vector3Int minCoords = new Vector3Int(Random.Range(0, oldDimensions.x - newDimensions.x), Random.Range(0, oldDimensions.y - newDimensions.y), Random.Range(0, oldDimensions.z - newDimensions.z));
-
-			int lastIndexFound = -1;
-
-			for(int z = 0; z < oldDimensions.z; z++) {
-				for(int y = 0; y < oldDimensions.y; y++) {
-					for(int x = 0; x < oldDimensions.x; x++) {
-						Vector3Int coords = new Vector3Int(x, y, z);
-
-						int newIndex;
-						Vector3Int newCoords;
-						GetIndexAndCoordsInNewGrid(coords, minCoords, newDimensions, out newIndex, out newCoords);
-
-						if(VoxelGrid.AreCoordsWithinDimensions(coords - minCoords, newDimensions)) {
-							Debug.AssertFormat(VoxelGrid.IndexToCoords(newIndex, newDimensions) == newCoords, "Fail: VoxelGrid.IndexToCoords({0}, {1}) ({2}) == {3}", newIndex, newDimensions, VoxelGrid.IndexToCoords(newIndex, newDimensions), newCoords);
-							Debug.AssertFormat(VoxelGrid.CoordsToIndex(newCoords, newDimensions) == newIndex, "Fail: VoxelGrid.CoordsToIndex({0}, {1}) ({2}) == {3}", newCoords, newDimensions, VoxelGrid.CoordsToIndex(newCoords, newDimensions), newIndex);
-							Debug.AssertFormat(newCoords == coords - minCoords, "Fail: {0} == {1} - {2} ({3})", newCoords, coords, minCoords, coords - minCoords);
-							Debug.AssertFormat(newIndex == lastIndexFound + 1, "Fail: {0} == {1} + 1", newIndex, lastIndexFound);
-						
-							lastIndexFound = newIndex;
-						}
-						else {
-							Debug.AssertFormat(newIndex == -1, "Fail: {0} == -1", newIndex);
-							Debug.AssertFormat(newCoords == -Vector3Int.one, "Fail: {0} == -Vector3Int.one", newCoords);
-						}
-					}
-				}
-			}
-		}
-
-		Debug.Log("== Done ==");
+	private static int GetIndexInNewGrid(int oldIndex, Vector3Int newGridStartCoord, Vector3Int oldGridDimensions, Vector3Int newGridDimensions) {
+		Vector3Int oldCoords = VoxelGrid.IndexToCoords(oldIndex, oldGridDimensions);
+		return VoxelGrid.CoordsToIndex(oldCoords - newGridStartCoord, newGridDimensions);
 	}
 }

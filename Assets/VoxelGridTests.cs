@@ -13,7 +13,6 @@ public partial class VoxelGrid
         TestGetVoxelNeighborStatuses();
         TestDoesFilledVoxelExist();
         TestTryGetVoxelAddress();
-        TestVoxelIndexToVoxelAddressAndViceVersa();
         TestVoxelAddressToVoxelCoordsAndViceVersa();
         TestGetVoxelAddressNeighbor();
         TestGetBiggestVoxelClusterIndex();
@@ -278,49 +277,6 @@ public partial class VoxelGrid
         }
     }
 
-    private static void TestVoxelIndexToVoxelAddressAndViceVersa() {
-        for(int i = 0; i < 100; i++) {
-            Vector3Int binGridDimensions = new Vector3Int(Random.Range(1, 10), Random.Range(1, 10), Random.Range(1, 10));
-            Vector3Int voxelGridDimensions = CalculateVoxelGridDimensions(binGridDimensions);
-
-            int globalVoxelIndex = 0;
-            for(int z = 0; z < voxelGridDimensions.z; z++) {
-                for(int y = 0; y < voxelGridDimensions.y; y++) {
-                    for(int x = 0; x < voxelGridDimensions.x; x++) {
-
-                        Vector3Int voxelCoords = new Vector3Int(x, y, z);
-                        Vector3Int binCoords = voxelCoords / Bin.WIDTH;
-                        Vector3Int localVoxelCoords = voxelCoords - binCoords * Bin.WIDTH;
-
-                        int binIndex = CoordsToIndex(binCoords, binGridDimensions);
-                        int localVoxelIndex = CoordsToIndex(localVoxelCoords, Bin.WIDTH);
-
-                        VoxelAddress actualAddress = new VoxelAddress(binIndex, localVoxelIndex);
-
-
-                        Assert(
-                            "VoxelIndexToVoxelAddress()",
-                            VoxelIndexToVoxelAddress,
-                            new Parameter("Index", globalVoxelIndex),
-                            new Parameter("Dimensions", binGridDimensions),
-                            expectedResult: actualAddress
-                        );
-
-                        Assert(
-                            "VoxelAddressToVoxelIndex()",
-                            VoxelAddressToVoxelIndex,
-                            new Parameter("Address", actualAddress),
-                            new Parameter("Dimensions", binGridDimensions),
-                            expectedResult: globalVoxelIndex
-                        );
-
-                        globalVoxelIndex++;
-                    }
-                }
-            }
-        }
-    }
-
     public static void TestVoxelAddressToVoxelCoordsAndViceVersa() {
         for(int i = 0; i < 100; i++) {
             Vector3Int binGridDimensions = new Vector3Int(Random.Range(1, 10), Random.Range(1, 10), Random.Range(1, 10));
@@ -373,12 +329,13 @@ public partial class VoxelGrid
 
                             void RunTestFromDirection(Direction dir) {
                                 Assert(
-                                    "GetVoxelAddressNeighbor()",
-                                    GetVoxelAddressNeighbor,
+                                    "TryGetVoxelAddressNeighbor()",
+                                    TryGetVoxelAddressNeighbor,
                                     new Parameter("Address", VoxelCoordsToVoxelAddress(globalVoxelCoords + GetDirectionVector(dir), binGridDimensions)),
                                     new Parameter("Dimensions", binGridDimensions),
                                     new Parameter("Direction", GetOppositeDirection(dir)),
-                                    expectedResult: address
+                                    expectedResult1: true,
+                                    expectedResult2: address
                                 );
                             }
 
@@ -505,9 +462,13 @@ public partial class VoxelGrid
         Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param));
     }
 
-    private static void Assert(string testName, Func<VoxelAddress, Vector3Int, Direction[], VoxelAddress> test, Parameter param1, Parameter param2, Parameter param3, VoxelAddress expectedResult) {
-        VoxelAddress result = test((VoxelAddress)param1.Value, (Vector3Int)param2.Value, (Direction[])param3.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2, param3));
+    delegate bool Test1(VoxelAddress address, Vector3Int dimensions, Direction direction, out VoxelAddress resultAddress);
+    private static void Assert(string testName, Test1 test, Parameter param1, Parameter param2, Parameter param3, bool expectedResult1, VoxelAddress expectedResult2) {
+        VoxelAddress resultAddress;
+        bool result = test((VoxelAddress)param1.Value, (Vector3Int)param2.Value, (Direction)param3.Value, out resultAddress);
+        
+        Debug.Assert(result == expectedResult1, GetMessage(testName, result, expectedResult1, param1, param2, param3));
+        Debug.Assert(resultAddress == expectedResult2, GetMessage(testName, result, expectedResult2, param1, param2, param3));
     }
 
     private static void Assert(string testName, Func<Vector3Int, Vector3Int, bool> test, Parameter param1, Parameter param2, bool expectedResult) {

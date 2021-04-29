@@ -28,26 +28,23 @@ public partial class VoxelGrid : MonoBehaviour
     private void Start() {
         if(isOriginal) {
             binGridDimensions = new Vector3Int(8, 8, 8);
-            bins = new Bin[binGridDimensions.x * binGridDimensions.y * binGridDimensions.z];
+            int binCount = binGridDimensions.x * binGridDimensions.y * binGridDimensions.z;
 
-            int index = 0;
-            for(int z = 0; z < binGridDimensions.z; z++) {
-                for(int y = 0; y < binGridDimensions.y; y++) {
-                    for(int x = 0; x < binGridDimensions.x; x++) {
-                        bins[index] = new Bin(index, binGridDimensions);
-                        index++;
-                    }
-                }
+            bins = new Bin[binCount];
+            for(int i = 0; i < binCount; i++) {
+                bins[i] = new Bin(i, binGridDimensions);
             }
 
             // this just ensures that the initial building will be in the same spot as it was placed in the editor - a bit ugly, but I haven't figured out anything better yet
-            Vector3Int voxelGridDimensions = VoxelGrid.CalculateVoxelGridDimensions(binGridDimensions);
+            Vector3Int voxelGridDimensions = CalculateVoxelGridDimensions(binGridDimensions);
             meshTransform.localPosition = new Vector3(-(voxelGridDimensions.x / 2f), 0.5f, -(voxelGridDimensions.z / 2f));
 
             ApplySettings(bins, binGridDimensions, offset: Vector3Int.zero, isStatic: true, isOriginalSetup: true);
 
-            for(int i = 0; i < voxelGridDimensions.x * voxelGridDimensions.y * voxelGridDimensions.z; i++) {
-                SetVoxelIsFilled(i, true);
+            for(int binIndex = 0; binIndex < binCount; binIndex++) {
+                for(int localVoxelIndex = 0; localVoxelIndex < Bin.SIZE; localVoxelIndex++) {
+                    SetVoxelIsFilled(new VoxelAddress(binIndex, localVoxelIndex), true);
+                }
             }
         }
     }
@@ -69,46 +66,45 @@ public partial class VoxelGrid : MonoBehaviour
         UpdateDirtyBinsAndVoxels();
     }
 
-    public void SetVoxelIsFilled(int voxelIndex, bool isFilled) {
-        VoxelAddress address = VoxelIndexToVoxelAddress(voxelIndex, binGridDimensions);
-
+    public void SetVoxelIsFilled(VoxelAddress address, bool isFilled) {
         Bin bin = bins[address.BinIndex];
-        if(bin == null) {
+        if(bin == null) { // TODO: maybe would make more sense to create the bin?
             return;
         }
 
         bin.SetVoxelIsFilled(address.LocalVoxelIndex, isFilled);
 
-        TryMarkVoxelAsDirty(address);
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Right));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Left));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Up));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Down));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Fore));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Back));
+        TryMarkNeighborAsDirty(address, Direction.None);
+        TryMarkNeighborAsDirty(address, Direction.Right);
+        TryMarkNeighborAsDirty(address, Direction.Left);
+        TryMarkNeighborAsDirty(address, Direction.Up);
+        TryMarkNeighborAsDirty(address, Direction.Down);
+        TryMarkNeighborAsDirty(address, Direction.Fore);
+        TryMarkNeighborAsDirty(address, Direction.Back);
+        TryMarkNeighborAsDirty(address, Direction.UpRight);
+        TryMarkNeighborAsDirty(address, Direction.UpLeft);
+        TryMarkNeighborAsDirty(address, Direction.UpFore);
+        TryMarkNeighborAsDirty(address, Direction.UpBack);
+        TryMarkNeighborAsDirty(address, Direction.DownRight);
+        TryMarkNeighborAsDirty(address, Direction.DownLeft);
+        TryMarkNeighborAsDirty(address, Direction.DownFore);
+        TryMarkNeighborAsDirty(address, Direction.DownBack);
 
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Up, Direction.Right));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Up, Direction.Left));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Up, Direction.Fore));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Up, Direction.Back));
+        void TryMarkNeighborAsDirty(VoxelAddress address, Direction voxelDirection) {
+            if(voxelDirection == Direction.None) {
+                TryMarkVoxelAsDirty(address);
+            }
 
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Down, Direction.Right));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Down, Direction.Left));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Down, Direction.Fore));
-        TryMarkVoxelAsDirty(GetVoxelAddressNeighbor(address, binGridDimensions, Direction.Down, Direction.Back));
+            VoxelAddress neighborAddress;
+            if(TryGetVoxelAddressNeighbor(address, binGridDimensions, voxelDirection, out neighborAddress)) {
+                TryMarkVoxelAsDirty(neighborAddress);
+            }
+        }
     }
 
     private void TryMarkVoxelAsDirty(VoxelAddress address) {
-        if(address.BinIndex == -1) {
-            return;
-        }
-
-        if(address.LocalVoxelIndex == -1) {
-            return;
-        }
-
-        Bin bin = bins[address.BinIndex];
-        if(bin == null) {
+        Bin bin;
+        if(!TryGetBin(address.BinIndex, out bin)) {
             return;
         }
 
@@ -116,8 +112,6 @@ public partial class VoxelGrid : MonoBehaviour
             dirtyBins.Enqueue(address.BinIndex);
         }
     }
-
-
 
     public void UpdateDirtyBinsAndVoxels() {
         Queue<int> updatedDirtyBins = new Queue<int>();
@@ -167,6 +161,10 @@ public partial class VoxelGrid : MonoBehaviour
         cluster = null;
 
         if(visitedBins[startBinIndex]) {
+            return false;
+        }
+
+        if(bins[startBinIndex] == null) {
             return false;
         }
 
@@ -287,7 +285,7 @@ public partial class VoxelGrid : MonoBehaviour
                     continue;
                 }
 
-                TryAddToPivot(v.GlobalCoords, isStatic, ref pivot, ref divisor);
+                TryAddToPivot(v.GetGlobalCoords(), isStatic, ref pivot, ref divisor);
             }
         }
 
