@@ -537,8 +537,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1972184183}
-  - component: {fileID: 1972184182}
   - component: {fileID: 1972184186}
+  - component: {fileID: 1972184182}
   - component: {fileID: 1972184185}
   - component: {fileID: 1972184184}
   m_Layer: 0
@@ -560,8 +560,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ac483f298657a24190502f522164f4e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  meshTransform: {fileID: 703501606}
-  isOriginal: 1
 --- !u!4 &1972184183
 Transform:
   m_ObjectHideFlags: 0
@@ -608,6 +606,7 @@ MonoBehaviour:
   meshObjectPrefab: {fileID: 4187036531089298799, guid: 692307d3a44a9da4db3547cecfd8e1a5, type: 3}
   material: {fileID: 2100000, guid: d350e0d5dd92ed34bb83431540d96967, type: 2}
   meshTransform: {fileID: 703501606}
+  dimensions: {x: 0, y: 0, z: 0}
 --- !u!114 &1972184186
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -620,6 +619,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 084057c3839422b43b93ab35c8ec3d5e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  meshTransform: {fileID: 703501606}
+  isOriginal: 1
 --- !u!1 &2064405285
 GameObject:
   m_ObjectHideFlags: 1

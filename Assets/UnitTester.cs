@@ -10,18 +10,8 @@ public class UnitTester : MonoBehaviour
     }
 
     [EasyButtons.Button]
-    public void TestVoxelController() {
-        VoxelController.RunTests();
-    }
-
-    [EasyButtons.Button]
     public void TestVoxelGrid() {
         VoxelGrid.RunTests();
-    }
-
-    [EasyButtons.Button]
-    public void TestBin() {
-        Bin.RunTests();
     }
 
     [EasyButtons.Button]
