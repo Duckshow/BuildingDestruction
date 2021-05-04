@@ -66,7 +66,7 @@ public class VoxelCluster {
 			return;
         } 
 
-		if(bin.IsWholeBinEmpty) {
+		if(bin.IsWholeBinEmpty()) {
 			return;
 		}
 
@@ -86,37 +86,12 @@ public class VoxelCluster {
 		maxCoord.y = Mathf.Max(maxCoord.y, binCoords.y);
 		maxCoord.z = Mathf.Max(maxCoord.z, binCoords.z);
 
-		NeighborRelationships hasVoxels = new NeighborRelationships();
-        if(bin.IsWholeBinFilled) {
-			hasVoxels = new NeighborRelationships(right: true, left: true, up: true, down: true, fore: true, back: true);
-        }
-        else {
-            if(bin.HasFilledVoxelOnFace(Direction.Right)) {
-				hasVoxels = NeighborRelationships.GetChanged(hasVoxels, Direction.Right, true);
-			}
-			if(bin.HasFilledVoxelOnFace(Direction.Left)) {
-				hasVoxels = NeighborRelationships.GetChanged(hasVoxels, Direction.Left, true);
-			}
-			if(bin.HasFilledVoxelOnFace(Direction.Up)) {
-				hasVoxels = NeighborRelationships.GetChanged(hasVoxels, Direction.Up, true);
-			}
-			if(bin.HasFilledVoxelOnFace(Direction.Down)) {
-				hasVoxels = NeighborRelationships.GetChanged(hasVoxels, Direction.Down, true);
-			}
-			if(bin.HasFilledVoxelOnFace(Direction.Fore)) {
-				hasVoxels = NeighborRelationships.GetChanged(hasVoxels, Direction.Fore, true);
-			}
-			if(bin.HasFilledVoxelOnFace(Direction.Back)) {
-				hasVoxels = NeighborRelationships.GetChanged(hasVoxels, Direction.Back, true);
-			}
-		}
-
-        if(hasVoxels.Right) { binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x + 1, binCoords.y, binCoords.z), binGridDimensions), Direction.Right)); }
-		if(hasVoxels.Left)	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x - 1, binCoords.y, binCoords.z), binGridDimensions), Direction.Left)); }
-		if(hasVoxels.Up)	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x, binCoords.y + 1, binCoords.z), binGridDimensions), Direction.Up)); }
-		if(hasVoxels.Down)	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x, binCoords.y - 1, binCoords.z), binGridDimensions), Direction.Down)); }
-		if(hasVoxels.Fore)	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x, binCoords.y, binCoords.z + 1), binGridDimensions), Direction.Fore)); }
-		if(hasVoxels.Back)	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x, binCoords.y, binCoords.z - 1), binGridDimensions), Direction.Back)); }
+        if(bin.IsWholeBinFilled() || bin.HasFilledVoxelOnFace(Direction.Right))	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x + 1, binCoords.y, binCoords.z), binGridDimensions), Direction.Right)); }
+		if(bin.IsWholeBinFilled() || bin.HasFilledVoxelOnFace(Direction.Left))	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x - 1, binCoords.y, binCoords.z), binGridDimensions), Direction.Left)); }
+		if(bin.IsWholeBinFilled() || bin.HasFilledVoxelOnFace(Direction.Up))	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x, binCoords.y + 1, binCoords.z), binGridDimensions), Direction.Up)); }
+		if(bin.IsWholeBinFilled() || bin.HasFilledVoxelOnFace(Direction.Down))	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x, binCoords.y - 1, binCoords.z), binGridDimensions), Direction.Down)); }
+		if(bin.IsWholeBinFilled() || bin.HasFilledVoxelOnFace(Direction.Fore))	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x, binCoords.y, binCoords.z + 1), binGridDimensions), Direction.Fore)); }
+		if(bin.IsWholeBinFilled() || bin.HasFilledVoxelOnFace(Direction.Back))	{ binQueue.Enqueue(new BinMove(VoxelGrid.CoordsToIndex(new Vector3Int(binCoords.x, binCoords.y, binCoords.z - 1), binGridDimensions), Direction.Back)); }
 	}
 
 	private static Bin[] MoveBinsToNewGrid(Bin[] oldBins, Vector3Int oldBinGridDimensions, Queue<int> indexesToMove, Vector3Int minCoord, Vector3Int maxCoord, out Vector3Int newBinGridDimensions) {

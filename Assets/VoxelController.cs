@@ -30,7 +30,7 @@ public class VoxelController : MonoBehaviour {
 							Bin bin;
 							voxelGrid.TryGetBin(binIndex, out bin);
 
-							Vector3Int localCoords = bin.GetVoxel(localVoxelIndex).LocalCoords;
+							Vector3Int localCoords = bin.GetVoxelLocalCoords(localVoxelIndex);
 							
 							if(localCoords.x == 0) {
 								voxelGrid.SetVoxelIsFilled(new VoxelAddress(binIndex, localVoxelIndex), false);
@@ -62,11 +62,11 @@ public class VoxelController : MonoBehaviour {
             }
 
             for(int localVoxelIndex = 0; localVoxelIndex < Bin.SIZE; localVoxelIndex++) {
-				if(!bin.GetVoxel(localVoxelIndex).IsFilled) {
+				if(!bin.GetVoxelIsFilled(localVoxelIndex)) {
 					continue;
 				}
 
-				Vector3 voxelWorldPos = bin.GetVoxel(localVoxelIndex).GetWorldPos(voxelGrid.GetMeshTransform());
+				Vector3 voxelWorldPos = bin.GetVoxelWorldPos(localVoxelIndex, voxelGrid.GetMeshTransform());
 				b.center = voxelWorldPos;
 
 				if(b.IntersectRay(ray)) {

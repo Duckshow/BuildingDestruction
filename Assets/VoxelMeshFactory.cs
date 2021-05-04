@@ -3,8 +3,6 @@ using System.Collections.Generic;
 
 public static class VoxelMeshFactory
 {
-	private enum Direction { Right, Left, Up, Down, Fore, Back }
-
 	private const float VOXEL_RADIUS = 0.5f;
 	private static readonly Vector3 LEFT = Vector3.left * VOXEL_RADIUS;
 	private static readonly Vector3 RIGHT = Vector3.right * VOXEL_RADIUS;
@@ -93,23 +91,22 @@ public static class VoxelMeshFactory
 	}
 
 	private static Mesh ConstructNewMesh(Bin bin) { // TODO: come up with a solution for not having two for-loops
-        if(bin.IsWholeBinEmpty) {
+        if(bin.IsWholeBinEmpty()) {
 			return null;
         }
 		
 		int faceCount = 0;
 		for(int i = 0; i < Bin.SIZE; i++) {
-			if(!bin.GetVoxel(i).IsFilled) {
+			if(!bin.GetVoxelIsFilled(i)) {
 				continue;
             }
 
-			NeighborRelationships connections = bin.GetVoxelConnections(i);
-			if(!connections.Right)	{ faceCount++; }
-			if(!connections.Left)	{ faceCount++; }
-			if(!connections.Up)		{ faceCount++; }
-			if(!connections.Down)	{ faceCount++; }
-			if(!connections.Fore)	{ faceCount++; }
-			if(!connections.Back)	{ faceCount++; }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Right))	{ faceCount++; }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Left))		{ faceCount++; }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Up))		{ faceCount++; }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Down))		{ faceCount++; }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Fore))		{ faceCount++; }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Back))		{ faceCount++; }
 		}
 
         if(faceCount == 0) {
@@ -127,21 +124,18 @@ public static class VoxelMeshFactory
 		int triIndex = 0;
 
 		for(int i = 0; i < Bin.SIZE; i++) {
-			Voxel v = bin.GetVoxel(i);
-
-			if(!v.IsFilled) {
+			if(!bin.GetVoxelIsFilled(i)) {
 				continue;
 			}
 
-			NeighborRelationships connections = bin.GetVoxelConnections(i);
-			Vector3Int localCoords = v.LocalCoords;
+			Vector3Int localCoords = bin.GetVoxelLocalCoords(i);
 
-			if(!connections.Right)	{ AddFace(localCoords, Direction.Right,	ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!connections.Left)	{ AddFace(localCoords, Direction.Left,	ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!connections.Up)		{ AddFace(localCoords, Direction.Up,	ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!connections.Down)	{ AddFace(localCoords, Direction.Down,	ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!connections.Fore)	{ AddFace(localCoords, Direction.Fore,	ref faceIndex, ref triIndex, verts, uvs, tris); }
-			if(!connections.Back)	{ AddFace(localCoords, Direction.Back,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Right))	{ AddFace(localCoords, Direction.Right,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Left))		{ AddFace(localCoords, Direction.Left,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Up))		{ AddFace(localCoords, Direction.Up,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Down))		{ AddFace(localCoords, Direction.Down,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Fore))		{ AddFace(localCoords, Direction.Fore,	ref faceIndex, ref triIndex, verts, uvs, tris); }
+			if(!bin.GetVoxelHasNeighbor(i, Direction.Back))		{ AddFace(localCoords, Direction.Back,	ref faceIndex, ref triIndex, verts, uvs, tris); }
 		}
 
 		return AssembleMesh(verts, uvs, tris);
@@ -193,7 +187,7 @@ public static class VoxelMeshFactory
 			const int SIDES = 6;
 			int offset = i * SIDES;
 
-			if(!bin.GetVoxel(i).IsFilled) {
+			if(!bin.GetVoxelIsFilled(i)) {
 				id |= 0ul << offset + 0;
 				id |= 0ul << offset + 1;
 				id |= 0ul << offset + 2;
@@ -202,13 +196,12 @@ public static class VoxelMeshFactory
 				id |= 0ul << offset + 5;
 			}
 			else {
-				NeighborRelationships connections = bin.GetVoxelConnections(i);
-				id |= (connections.Right ?	1ul : 0ul) << offset + 0;
-				id |= (connections.Left ?	1ul : 0ul) << offset + 1;
-				id |= (connections.Up ?		1ul : 0ul) << offset + 2;
-				id |= (connections.Down ?	1ul : 0ul) << offset + 3;
-				id |= (connections.Fore ?	1ul : 0ul) << offset + 4;
-				id |= (connections.Back ?	1ul : 0ul) << offset + 5;
+				id |= (bin.GetVoxelHasNeighbor(i, Direction.Right)	?	1ul : 0ul) << offset + 0;
+				id |= (bin.GetVoxelHasNeighbor(i, Direction.Left)	?	1ul : 0ul) << offset + 1;
+				id |= (bin.GetVoxelHasNeighbor(i, Direction.Up)		?	1ul : 0ul) << offset + 2;
+				id |= (bin.GetVoxelHasNeighbor(i, Direction.Down)	?	1ul : 0ul) << offset + 3;
+				id |= (bin.GetVoxelHasNeighbor(i, Direction.Fore)	?	1ul : 0ul) << offset + 4;
+				id |= (bin.GetVoxelHasNeighbor(i, Direction.Back)	?	1ul : 0ul) << offset + 5;
 			}
 		}
 
@@ -232,15 +225,6 @@ public static class VoxelMeshFactory
             for(int y = 0; y < Bin.WIDTH; y++) {
                 for(int x = 0; x < Bin.WIDTH; x++) {
 					bin.SetVoxelIsFilled(index, isFilled: true);
-					bin.SetVoxelConnections(index, new NeighborRelationships(
-						right:	x < Bin.WIDTH - 1,
-						left:	x > 0,
-						up:		y < Bin.WIDTH - 1,
-						down:	y > 0,
-						fore:	z < Bin.WIDTH - 1,
-						back:	z > 0
-					));
-
 					index++;
 				}
             }
@@ -269,7 +253,6 @@ public static class VoxelMeshFactory
 
             for(int i = 0; i < Bin.SIZE; i++) {
 				bin.SetVoxelIsFilled(i, isFilled);
-				bin.SetVoxelConnections(i, new NeighborRelationships(hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack));
             }
 
 			return bin;

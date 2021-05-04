@@ -7,6 +7,16 @@ public partial class VoxelGrid
         return meshTransform;
     }
 
+    public bool TryGetBin(Vector3Int coords, out Bin bin) {
+        if(!AreCoordsWithinDimensions(coords, binGridDimensions)) {
+            bin = null;
+            return false;
+        }
+
+        int index = CoordsToIndex(coords, binGridDimensions);
+        return TryGetBin(index, out bin);
+    }
+
     public bool TryGetBin(int index, out Bin bin) {
         bin = bins[index];
         return bin != null;
@@ -25,11 +35,7 @@ public partial class VoxelGrid
     }
 
     public static bool AreCoordsWithinDimensions(Vector3Int coords, Vector3Int dimensions) {
-        return AreCoordsWithinDimensions(coords.x, coords.y, coords.z, dimensions);
-    }
-
-    public static bool AreCoordsWithinDimensions(int x, int y, int z, Vector3Int dimensions) {
-        return AreCoordsWithinDimensions(x, y, z, dimensions.x, dimensions.y, dimensions.z);
+        return AreCoordsWithinDimensions(coords.x, coords.y, coords.z, dimensions.x, dimensions.y, dimensions.z);
     }
 
     public static bool AreCoordsWithinDimensions(int x, int y, int z, int widthX, int widthY, int widthZ) {
@@ -116,17 +122,6 @@ public partial class VoxelGrid
         return Direction.None;
     }
 
-    private static NeighborRelationships GetVoxelNeighborStatuses(Vector3Int voxelCoords, Bin[] bins, Vector3Int binGridDimensions) {
-        return new NeighborRelationships(
-            right: DoesFilledVoxelExist(new Vector3Int(voxelCoords.x + 1, voxelCoords.y, voxelCoords.z), bins, binGridDimensions),
-            left: DoesFilledVoxelExist(new Vector3Int(voxelCoords.x - 1, voxelCoords.y, voxelCoords.z), bins, binGridDimensions),
-            up: DoesFilledVoxelExist(new Vector3Int(voxelCoords.x, voxelCoords.y + 1, voxelCoords.z), bins, binGridDimensions),
-            down: DoesFilledVoxelExist(new Vector3Int(voxelCoords.x, voxelCoords.y - 1, voxelCoords.z), bins, binGridDimensions),
-            fore: DoesFilledVoxelExist(new Vector3Int(voxelCoords.x, voxelCoords.y, voxelCoords.z + 1), bins, binGridDimensions),
-            back: DoesFilledVoxelExist(new Vector3Int(voxelCoords.x, voxelCoords.y, voxelCoords.z - 1), bins, binGridDimensions)
-        );
-    }
-
     private static bool DoesFilledVoxelExist(Vector3Int voxelCoords, Bin[] bins, Vector3Int binGridDimensions) {
         VoxelAddress address;
 
@@ -138,7 +133,7 @@ public partial class VoxelGrid
             return false;
         }
 
-        return bins[address.BinIndex].GetVoxel(address.LocalVoxelIndex).IsFilled;
+        return bins[address.BinIndex].GetVoxelIsFilled(address.LocalVoxelIndex);
     }
 
     private static bool TryGetVoxelAddress(Vector3Int voxelCoords, Vector3Int binGridDimensions, out VoxelAddress address) {

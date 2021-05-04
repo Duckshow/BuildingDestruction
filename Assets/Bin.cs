@@ -1,68 +1,54 @@
 using UnityEngine;
 using System;
 
-public class Bin { // TODO: this doesn't support any other width than 2!
-    public const int WIDTH = 2;
+public partial class Bin {
+    public const int WIDTH = 2; //! WARNING: WIDTH is hardcoded in many places, changing this will require a lot of work!
     public const int SIZE = 8; // must be WIDTH ^ 3
+
+    private const byte VOXELS_PER_FACE = WIDTH * WIDTH;
+
+    private static readonly Vector3Int[] LOCAL_COORDS_LOOKUP = new Vector3Int[] {
+        new Vector3Int(0, 0, 0),
+        new Vector3Int(1, 0, 0),
+        new Vector3Int(0, 1, 0),
+        new Vector3Int(1, 1, 0),
+        new Vector3Int(0, 0, 1),
+        new Vector3Int(1, 0, 1),
+        new Vector3Int(0, 1, 1),
+        new Vector3Int(1, 1, 1)
+    };
 
     public int Index { get; private set; }
     public Vector3Int Coords { get; private set; }
-    public Voxel[] Voxels { get; private set; }
-    public bool IsDirty { get; private set; }
-    public bool IsWholeBinFilled { get; private set; }
-    public bool IsWholeBinEmpty { get; private set; }
 
-    private bool[] areVoxelsDirty;
-    private NeighborRelationships[] voxelConnections;
-
+    private byte voxels;
+    private byte areVoxelsDirty;
+    private byte voxelNeighborsRightLeft;
+    private byte voxelNeighborsUpDown;
+    private byte voxelNeighborsForeBack;
 
     public Bin(int index, Vector3Int binGridDimensions) {
         Index = index;
         Coords = VoxelGrid.IndexToCoords(index, binGridDimensions);
-
-        Vector3Int voxelGridDimensions = VoxelGrid.CalculateVoxelGridDimensions(binGridDimensions);
-
-        Voxels = new Voxel[SIZE];
-        for(int i = 0; i < SIZE; i++) {
-            Voxels[i] = new Voxel(this, i, voxelGridDimensions);
-        }
-
-        areVoxelsDirty = new bool[SIZE];
     }
 
     public Bin(int index, Vector3Int binGridDimensions, Bin bin) {
         Index = index;
         Coords = VoxelGrid.IndexToCoords(index, binGridDimensions);
 
-        Vector3Int voxelGridDimensions = VoxelGrid.CalculateVoxelGridDimensions(binGridDimensions);
-
-        Voxels = new Voxel[SIZE];
-        for(int i = 0; i < SIZE; i++) {
-            Voxels[i] = new Voxel(this, i, voxelGridDimensions, bin.Voxels[i].IsFilled);
-        }
-
-        IsDirty = bin.IsDirty;
-        IsWholeBinFilled = bin.IsWholeBinFilled;
-        IsWholeBinEmpty = bin.IsWholeBinEmpty;
-
+        voxels = bin.voxels;
         areVoxelsDirty = bin.areVoxelsDirty;
-        voxelConnections = bin.voxelConnections;
-    }
 
-    public void SetVoxelIsFilled(int localIndex, bool isFilled) {
-        Voxels[localIndex] = new Voxel(Voxels[localIndex], isFilled);
-    }
-
-    public Voxel GetVoxel(int localIndex) {
-        return Voxels[localIndex];
+        voxelNeighborsRightLeft = bin.voxelNeighborsRightLeft;
+        voxelNeighborsUpDown = bin.voxelNeighborsUpDown;
+        voxelNeighborsForeBack = bin.voxelNeighborsForeBack;
     }
 
     public bool HasFilledVoxelOnFace(Direction face) {
-        int[] faceIndexes = GetVoxelIndexesForBinFace(face);
-        for(int i = 0; i < faceIndexes.Length; i++) {
-            int voxelLocalIndex = faceIndexes[i];
+        for(int i = 0; i < VOXELS_PER_FACE; i++) {
+            int localVoxelIndex = FaceVoxelIndexToLocalVoxelIndex(i, face);
 
-            if(GetVoxel(voxelLocalIndex).IsFilled) {
+            if(GetVoxelIsFilled(localVoxelIndex)) {
                 return true;
             }
         }
@@ -70,187 +56,225 @@ public class Bin { // TODO: this doesn't support any other width than 2!
         return false;
     }
 
-    public static int[] GetVoxelIndexesForBinFace(Direction face) {
-        switch(face) {
-            case Direction.Right:{ return new int[] { 1, 3, 5, 7 }; }
-            case Direction.Left: { return new int[] { 0, 2, 4, 6 }; }
-            case Direction.Up:   { return new int[] { 2, 3, 6, 7 }; }
-            case Direction.Down: { return new int[] { 0, 1, 4, 5 }; }
-            case Direction.Fore: { return new int[] { 4, 5, 6, 7 }; }
-            case Direction.Back: { return new int[] { 0, 1, 2, 3 }; }
-        }
-
-        return null;
+    public bool IsWholeBinFilled() {
+        return voxels == byte.MaxValue;
+    }
+    
+    public bool IsWholeBinEmpty() {
+        return voxels == byte.MinValue;
     }
 
-    public NeighborRelationships GetVoxelConnections(int index) {
-        return voxelConnections[index];
+    public bool IsDirty() {
+        return areVoxelsDirty > 0;
     }
 
-    public void SetVoxelConnections(int index, NeighborRelationships connections) {
-        if(voxelConnections == null) {
-            voxelConnections = new NeighborRelationships[SIZE];
-        }
-
-        voxelConnections[index] = connections;
+    public void SetClean() {
+        areVoxelsDirty = 0;
     }
 
-    public void RefreshIsWholeBinFilled() {
-        IsWholeBinFilled = true;
-        
-        for(int i = 0; i < SIZE; i++) {
-            if(!GetVoxel(i).IsFilled) {
-                IsWholeBinFilled = false;
-                return;
-            }
-        }
+    public Vector3 GetVoxelWorldPos(int localVoxelIndex, Transform meshTransform) {
+        return meshTransform.TransformPoint(GetVoxelGlobalCoords(localVoxelIndex));
     }
 
-    public void RefreshIsWholeBinEmpty() {
-        IsWholeBinEmpty = true;
-
-        for(int i = 0; i < SIZE; i++) {
-            if(GetVoxel(i).IsFilled) {
-                IsWholeBinEmpty = false;
-                return;
-            }
-        }
+    public Vector3Int GetVoxelGlobalCoords(int localVoxelIndex) {
+        return Coords * WIDTH + GetVoxelLocalCoords(localVoxelIndex);
     }
 
-    public bool TryMarkVoxelAsDirty(int localIndex) {
-        if(!GetVoxel(localIndex).IsFilled) {
+    public Vector3Int GetVoxelLocalCoords(int localVoxelIndex) {
+        return LOCAL_COORDS_LOOKUP[localVoxelIndex];
+    }
+
+    public bool GetVoxelIsFilled(int localVoxelIndex) {
+        return Utils.GetValueFromByte(voxels, localVoxelIndex);
+    }
+
+    public void SetVoxelIsFilled(int localVoxelIndex, bool isFilled) {
+        Utils.SetValueInByte(ref voxels, localVoxelIndex, isFilled);
+    }
+
+    public bool TryMarkVoxelAsDirty(int localVoxelIndex) {
+        if(!GetVoxelIsFilled(localVoxelIndex)) {
             return false;
         }
 
-        IsDirty = true;
-        areVoxelsDirty[localIndex] = true;
+        Utils.SetValueInByte(ref areVoxelsDirty, localVoxelIndex, true);
         return true;
     }
 
-    public void ClearDirty() {
-        IsDirty = false;
-        areVoxelsDirty = new bool[SIZE];
+    public void RefreshConnectivity(Bin binRight, Bin binLeft, Bin binUp, Bin binDown, Bin binFore, Bin binBack) {
+        RefreshConnectivity(binRight, binLeft, binUp, binDown, binFore, binBack, out voxelNeighborsRightLeft, out voxelNeighborsUpDown, out voxelNeighborsForeBack);
     }
 
-    public bool[] GetAreVoxelsDirty() {
-        return areVoxelsDirty;
-    }
-}
+    private static void RefreshConnectivity(Bin binRight, Bin binLeft, Bin binUp, Bin binDown, Bin binFore, Bin binBack, out byte voxelNeighborsRightLeft, out byte voxelNeighborsUpDown, out byte voxelNeighborsForeBack) {
+        voxelNeighborsRightLeft = 0;
+        voxelNeighborsUpDown = 0;
+        voxelNeighborsForeBack = 0;
 
-public readonly struct Voxel {
-    public readonly Bin OwnerBin;
+        TryAddVoxelNeighbors(ref voxelNeighborsRightLeft, binRight, Direction.Right, bitOffset: 0);
+        TryAddVoxelNeighbors(ref voxelNeighborsRightLeft, binLeft, Direction.Left, bitOffset: VOXELS_PER_FACE);
+        TryAddVoxelNeighbors(ref voxelNeighborsUpDown, binUp, Direction.Up, bitOffset: 0);
+        TryAddVoxelNeighbors(ref voxelNeighborsUpDown, binDown, Direction.Down, bitOffset: VOXELS_PER_FACE);
+        TryAddVoxelNeighbors(ref voxelNeighborsForeBack, binFore, Direction.Fore, bitOffset: 0);
+        TryAddVoxelNeighbors(ref voxelNeighborsForeBack, binBack, Direction.Back, bitOffset: VOXELS_PER_FACE);
 
-    public readonly int LocalIndex;
-    public readonly Vector3Int LocalCoords;
-    
-    public readonly bool IsFilled;
+        static void TryAddVoxelNeighbors(ref byte axisVoxelNeighbors, Bin neighborBin, Direction binDirection, byte bitOffset) {
+            if(neighborBin == null) {
+                return;
+            }
 
-    public Voxel(Bin ownerBin, int localIndex, Vector3Int voxelGridDimensions, bool isFilled = false) {
-        OwnerBin = ownerBin;
+            Direction neighborFace = VoxelGrid.GetOppositeDirection(binDirection);
 
-        LocalIndex = localIndex;
-        LocalCoords = VoxelGrid.IndexToCoords(LocalIndex, width: Bin.WIDTH);
+            for(byte i = 0; i < VOXELS_PER_FACE; i++) {
+                int faceVoxelIndex = FaceVoxelIndexToLocalVoxelIndex(i, neighborFace);
+                bool hasVoxelNeighbor = (neighborBin.voxels >> faceVoxelIndex & 1) == 1;
 
-        IsFilled = isFilled;
-    }
-
-    public Voxel(Voxel v, bool isFilled) {
-        OwnerBin = v.OwnerBin;
-
-        LocalIndex = v.LocalIndex;
-        LocalCoords = v.LocalCoords;
-
-        IsFilled = isFilled;
+                Utils.SetValueInByte(ref axisVoxelNeighbors, bitOffset + i, hasVoxelNeighbor);
+            }
+        }
     }
 
-    public Vector3 GetWorldPos(Transform meshTransform) {
-        return meshTransform.TransformPoint(GetGlobalCoords());
+    public bool GetVoxelHasNeighbor(int localVoxelIndex, Direction direction) {
+        return GetVoxelHasNeighbor(localVoxelIndex, direction, voxels, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
     }
 
-    public Vector3 GetGlobalCoords() {
-        return OwnerBin.Coords * Bin.WIDTH + LocalCoords;
-    }
-}
+    private static bool GetVoxelHasNeighbor(int localVoxelIndex, Direction direction, byte binVoxels, byte voxelNeighborsRightLeft, byte voxelNeighborsUpDown, byte voxelNeighborsForeBack) {
+        Vector3Int localCoords = LOCAL_COORDS_LOOKUP[localVoxelIndex];
+        Vector3Int neighborCoords = localCoords + VoxelGrid.GetDirectionVector(direction);
 
-public readonly struct NeighborRelationships : IEquatable<NeighborRelationships> {
-    public readonly bool Right;
-    public readonly bool Left;
-    public readonly bool Up;
-    public readonly bool Down;
-    public readonly bool Fore;
-    public readonly bool Back;
+        if(!VoxelGrid.AreCoordsWithinDimensions(neighborCoords.x, neighborCoords.y, neighborCoords.z, WIDTH, WIDTH, WIDTH)) {
+            byte voxelNeighbors = GetCachedVoxelNeighbors(direction, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
+            int index = LocalVoxelIndexToFaceVoxelIndex(localVoxelIndex, direction);
 
-    public NeighborRelationships(bool right, bool left, bool up, bool down, bool fore, bool back) {
-        Right = right;
-        Left = left;
-        Up = up;
-        Down = down;
-        Fore = fore;
-        Back = back;
-    }
-
-    public bool Get(Direction dir) {
-        switch(dir) {
-            case Direction.Right:   return Right;
-            case Direction.Left:    return Left;
-            case Direction.Up:      return Up;
-            case Direction.Down:    return Down;
-            case Direction.Fore:    return Fore;
-            case Direction.Back:    return Back;
+            return ((voxelNeighbors >> index) & 1) > 0;
         }
 
-        return false;
+        int neighborLocalVoxelIndex = VoxelGrid.CoordsToIndex(neighborCoords, WIDTH);
+        return Utils.GetValueFromByte(binVoxels, neighborLocalVoxelIndex);
     }
 
-    public static NeighborRelationships GetChanged(NeighborRelationships neighborRelationships, Direction dir, bool b) {
-        bool Right = neighborRelationships.Right;
-        bool Left = neighborRelationships.Left;
-        bool Up = neighborRelationships.Up;
-        bool Down = neighborRelationships.Down;
-        bool Fore = neighborRelationships.Fore;
-        bool Back = neighborRelationships.Back;
+    private static byte GetCachedVoxelNeighbors(Direction direction, byte voxelNeighborsRightLeft, byte voxelNeighborsUpDown, byte voxelNeighborsForeBack) {
+        const byte ONE_PER_NEIGHBOR = (1 << VOXELS_PER_FACE) - 1;
 
-        switch(dir) {
-            case Direction.Right:   { Right = b; break; }
-            case Direction.Left:    { Left = b; break; }
-            case Direction.Up:      { Up = b; break; }
-            case Direction.Down:    { Down = b; break; }
-            case Direction.Fore:    { Fore = b; break; }
-            case Direction.Back:    { Back = b; break; }
+        switch(direction) {
+            case Direction.Right: {
+                return (byte)(voxelNeighborsRightLeft & ONE_PER_NEIGHBOR);
+            }
+            case Direction.Left: {
+                return (byte)((voxelNeighborsRightLeft >> VOXELS_PER_FACE) & ONE_PER_NEIGHBOR);
+            }
+            case Direction.Up: {
+                return (byte)(voxelNeighborsUpDown & ONE_PER_NEIGHBOR);
+            }
+            case Direction.Down: {
+                return (byte)((voxelNeighborsUpDown >> VOXELS_PER_FACE) & ONE_PER_NEIGHBOR);
+            }
+            case Direction.Fore: {
+                return (byte)(voxelNeighborsForeBack & ONE_PER_NEIGHBOR);
+            }
+            case Direction.Back: {
+                return (byte)((voxelNeighborsForeBack >> VOXELS_PER_FACE) & ONE_PER_NEIGHBOR);
+            }
+            default: {
+                throw new NotImplementedException();
+            }
+        }
+    }
+
+    private static int LocalVoxelIndexToFaceVoxelIndex(int localVoxelIndex, Direction face) {
+        switch(face) {
+            case Direction.Right: {
+                if(localVoxelIndex == 1) { return 0; }
+                if(localVoxelIndex == 3) { return 1; }
+                if(localVoxelIndex == 5) { return 2; }
+                if(localVoxelIndex == 7) { return 3; }
+                break;
+            }
+            case Direction.Left: {
+                if(localVoxelIndex == 0) { return 0; }
+                if(localVoxelIndex == 2) { return 1; }
+                if(localVoxelIndex == 4) { return 2; }
+                if(localVoxelIndex == 6) { return 3; }
+                break;
+            }
+            case Direction.Up: {
+                if(localVoxelIndex == 2) { return 0; }
+                if(localVoxelIndex == 3) { return 1; }
+                if(localVoxelIndex == 6) { return 2; }
+                if(localVoxelIndex == 7) { return 3; }
+                break;
+            }
+            case Direction.Down: {
+                if(localVoxelIndex == 0) { return 0; }
+                if(localVoxelIndex == 1) { return 1; }
+                if(localVoxelIndex == 4) { return 2; }
+                if(localVoxelIndex == 5) { return 3; }
+                break;
+            }
+            case Direction.Fore: {
+                if(localVoxelIndex == 4) { return 0; }
+                if(localVoxelIndex == 5) { return 1; }
+                if(localVoxelIndex == 6) { return 2; }
+                if(localVoxelIndex == 7) { return 3; }
+                break;
+            }
+            case Direction.Back: {
+                if(localVoxelIndex == 0) { return 0; }
+                if(localVoxelIndex == 1) { return 1; }
+                if(localVoxelIndex == 2) { return 2; }
+                if(localVoxelIndex == 3) { return 3; }
+                break;
+            }
         }
 
-        return new NeighborRelationships(Right, Left, Up, Down, Fore, Back);
+        return -1;
     }
 
-    public override bool Equals(object obj) {
-        return base.Equals(obj);
-    }
+    private static int FaceVoxelIndexToLocalVoxelIndex(int faceVoxelIndex, Direction face) {
+        switch(face) {
+            case Direction.Right: {
+                if(faceVoxelIndex == 0) { return 1; }
+                if(faceVoxelIndex == 1) { return 3; }
+                if(faceVoxelIndex == 2) { return 5; }
+                if(faceVoxelIndex == 3) { return 7; }
+                break;
+            }
+            case Direction.Left: {
+                if(faceVoxelIndex == 0) { return 0; }
+                if(faceVoxelIndex == 1) { return 2; }
+                if(faceVoxelIndex == 2) { return 4; }
+                if(faceVoxelIndex == 3) { return 6; }
+                break;
+            }
+            case Direction.Up: {
+                if(faceVoxelIndex == 0) { return 2; }
+                if(faceVoxelIndex == 1) { return 3; }
+                if(faceVoxelIndex == 2) { return 6; }
+                if(faceVoxelIndex == 3) { return 7; }
+                break;
+            }
+            case Direction.Down: {
+                if(faceVoxelIndex == 0) { return 0; }
+                if(faceVoxelIndex == 1) { return 1; }
+                if(faceVoxelIndex == 2) { return 4; }
+                if(faceVoxelIndex == 3) { return 5; }
+                break;
+            }
+            case Direction.Fore: {
+                if(faceVoxelIndex == 0) { return 4; }
+                if(faceVoxelIndex == 1) { return 5; }
+                if(faceVoxelIndex == 2) { return 6; }
+                if(faceVoxelIndex == 3) { return 7; }
+                break;
+            }
+            case Direction.Back: {
+                if(faceVoxelIndex == 0) { return 0; }
+                if(faceVoxelIndex == 1) { return 1; }
+                if(faceVoxelIndex == 2) { return 2; }
+                if(faceVoxelIndex == 3) { return 3; }
+                break;
+            }
+        }
 
-    public bool Equals(NeighborRelationships other) {
-        return 
-            Right == other.Right &&
-            Left == other.Left &&
-            Up == other.Up &&
-            Down == other.Down &&
-            Fore == other.Fore &&
-            Back == other.Back;
+        return -1;
     }
-
-    public override int GetHashCode() {
-        int hashCode = -370893141;
-        hashCode = hashCode * -1521134295 + Right.GetHashCode();
-        hashCode = hashCode * -1521134295 + Left.GetHashCode();
-        hashCode = hashCode * -1521134295 + Up.GetHashCode();
-        hashCode = hashCode * -1521134295 + Down.GetHashCode();
-        hashCode = hashCode * -1521134295 + Fore.GetHashCode();
-        hashCode = hashCode * -1521134295 + Back.GetHashCode();
-        return hashCode;
-    }
-
-    public override string ToString() {
-        return string.Format("(Right: {0}, Left: {1}, Up: {2}, Down: {3}, Fore: {4}, Back: {5})", Right, Left, Up, Down, Fore, Back);
-    }
-
-    public static bool operator ==(NeighborRelationships lhs, NeighborRelationships rhs) => lhs.Equals(rhs);
-    public static bool operator !=(NeighborRelationships lhs, NeighborRelationships rhs) => !(lhs == rhs);
 }
