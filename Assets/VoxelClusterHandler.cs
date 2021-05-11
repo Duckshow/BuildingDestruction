@@ -219,7 +219,7 @@ public static partial class VoxelClusterHandler {
                         }
 
                         Bin neighborBin = bins[neighborIndex];
-                        if(neighborBin == null) {
+                        if(neighborBin.IsWholeBinEmpty()) {
                             return false;
                         }
 
@@ -249,43 +249,38 @@ public static partial class VoxelClusterHandler {
         Vector3Int newVoxelOffset = minCoord * Bin.WIDTH;
         Vector3Int newDimensions;
         Bin[] newBins = MoveBinsToNewGrid(bins, binGridDimensions, foundBins, minCoord, maxCoord, out newDimensions);
-        bool[] interiorMap = GetInteriorMap(newBins, newDimensions);
+        MarkExteriorBins(newBins, newDimensions);
 
-        return new VoxelCluster(newBins, interiorMap, newVoxelOffset, newDimensions);
+        return new VoxelCluster(newBins, newVoxelOffset, newDimensions);
     }
 
-    private static bool[] GetInteriorMap(Bin[] bins, Vector3Int binGridDimensions) {
+    private static void MarkExteriorBins(Bin[] bins, Vector3Int binGridDimensions) {
         int binCount = bins.Length;
 
         bool[] visitedExteriorBins = new bool[binCount];
-        bool[] interiorMap = new bool[binCount];
-
-        for(int i = 0; i < binCount; ++i) {
-            interiorMap[i] = true;
-        }
 
         for(int z = 0; z < binGridDimensions.z; ++z) {
             for(int y = 0; y < binGridDimensions.y; y++) {
-                FloodFillExteriorBins(new Vector3Int(0, y, z), bins, binGridDimensions, visitedExteriorBins, interiorMap);
-                FloodFillExteriorBins(new Vector3Int(binGridDimensions.x - 1, y, z), bins, binGridDimensions, visitedExteriorBins, interiorMap);
+                FloodFillExteriorBins(new Vector3Int(0, y, z), bins, binGridDimensions, visitedExteriorBins);
+                FloodFillExteriorBins(new Vector3Int(binGridDimensions.x - 1, y, z), bins, binGridDimensions, visitedExteriorBins);
             }
         }
 
         for(int z = 0; z < binGridDimensions.z; ++z) {
             for(int x = 0; x < binGridDimensions.x; x++) {
-                FloodFillExteriorBins(new Vector3Int(x, 0, z), bins, binGridDimensions, visitedExteriorBins, interiorMap);
-                FloodFillExteriorBins(new Vector3Int(x, binGridDimensions.y - 1, z), bins, binGridDimensions, visitedExteriorBins, interiorMap);
+                FloodFillExteriorBins(new Vector3Int(x, 0, z), bins, binGridDimensions, visitedExteriorBins);
+                FloodFillExteriorBins(new Vector3Int(x, binGridDimensions.y - 1, z), bins, binGridDimensions, visitedExteriorBins);
             }
         }
 
         for(int y = 0; y < binGridDimensions.y; ++y) {
             for(int x = 0; x < binGridDimensions.x; x++) {
-                FloodFillExteriorBins(new Vector3Int(x, y, 0), bins, binGridDimensions, visitedExteriorBins, interiorMap);
-                FloodFillExteriorBins(new Vector3Int(x, y, binGridDimensions.z - 1), bins, binGridDimensions, visitedExteriorBins, interiorMap);
+                FloodFillExteriorBins(new Vector3Int(x, y, 0), bins, binGridDimensions, visitedExteriorBins);
+                FloodFillExteriorBins(new Vector3Int(x, y, binGridDimensions.z - 1), bins, binGridDimensions, visitedExteriorBins);
             }
         }
 
-        static void FloodFillExteriorBins(Vector3Int startBinCoords, Bin[] bins, Vector3Int binGridDimensions, bool[] visitedBins, bool[] interiorMap) {
+        static void FloodFillExteriorBins(Vector3Int startBinCoords, Bin[] bins, Vector3Int binGridDimensions, bool[] visitedBins) {
             Queue<MoveOrder> binsToVisit = new Queue<MoveOrder>();
             binsToVisit.Enqueue(new MoveOrder(VoxelGrid.CoordsToIndex(startBinCoords, binGridDimensions), Direction.None));
 
@@ -301,10 +296,10 @@ public static partial class VoxelClusterHandler {
                 }
 
                 visitedBins[currentBinIndex] = true;
-                interiorMap[currentBinIndex] = false;
+                Bin.SetBinIsExterior(bins, currentBinIndex, isExterior: true);
                 
                 Bin currentBin = bins[currentBinIndex];
-                if(currentBin != null && currentBin.IsWholeBinFilled()) {
+                if(currentBin.IsWholeBinFilled()) {
                     continue;
                 }
 
@@ -331,7 +326,7 @@ public static partial class VoxelClusterHandler {
                 }
 
                 static bool TryGetNewMoveOrder(Direction direction, Bin currentBin, Vector3Int binCoords, Vector3Int binGridDimensions, MoveOrder currentMoveOrder, out MoveOrder newMoveOrder) {
-                    if(currentBin != null && !currentBin.HasOpenPathBetweenFaces(currentMoveOrder.DirectionToOrigin, direction)) {
+                    if(!currentBin.IsWholeBinEmpty() && !currentBin.HasOpenPathBetweenFaces(currentMoveOrder.DirectionToOrigin, direction)) {
                         newMoveOrder = new MoveOrder();
                         return false;
                     }
@@ -341,8 +336,6 @@ public static partial class VoxelClusterHandler {
                 }
             }
         }
-
-        return interiorMap;
     }
 
     private static Bin[] MoveBinsToNewGrid(Bin[] oldBins, Vector3Int oldBinGridDimensions, Queue<int> indexesToMove, Vector3Int minCoord, Vector3Int maxCoord, out Vector3Int newBinGridDimensions) {
@@ -354,7 +347,7 @@ public static partial class VoxelClusterHandler {
             Vector3Int oldBinCoords = VoxelGrid.IndexToCoords(oldBinIndex, oldBinGridDimensions);
             int newBinIndex = VoxelGrid.CoordsToIndex(oldBinCoords - minCoord, newBinGridDimensions);
 
-            newBins[newBinIndex] = new Bin(newBinIndex, newBinGridDimensions, oldBins[oldBinIndex]);
+            newBins[newBinIndex] = new Bin(oldBins[oldBinIndex], newBinIndex, newBinGridDimensions);
         }
 
         return newBins;

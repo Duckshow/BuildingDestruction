@@ -68,7 +68,7 @@ public static class VoxelMeshFactory
 	private static Dictionary<ulong, Mesh> cachedMeshes = new Dictionary<ulong, Mesh>();
 
 	public static bool TryGetMesh(Bin bin, out Mesh mesh) {
-        if(bin == null) {
+        if(bin.IsWholeBinEmpty()) {
 			mesh = null;
 			return false;
         }
@@ -219,7 +219,7 @@ public static class VoxelMeshFactory
 
 	private static void TestGetMesh() {
 		Bin bin = new Bin(0, Vector3Int.one);
-		bin.SetAllVoxelExists(true);
+		bin = Bin.SetBinAllVoxelsExists(bin, true);
 
 		ulong id = GetID(bin);
 
@@ -239,9 +239,9 @@ public static class VoxelMeshFactory
 	}
 
 	private static void TestGetID() {
-		Bin GetNewBin(bool isFilled, bool hasNeighborRight, bool hasNeighborLeft, bool hasNeighborUp, bool hasNeighborDown, bool hasNeighborFore, bool hasNeighborBack) {
+		Bin GetNewBin(bool exists, bool hasNeighborRight, bool hasNeighborLeft, bool hasNeighborUp, bool hasNeighborDown, bool hasNeighborFore, bool hasNeighborBack) {
 			Bin bin = new Bin(0, Vector3Int.one);
-			bin.SetAllVoxelExists(isFilled);
+			bin = Bin.SetBinAllVoxelsExists(bin, exists);
 
 			Bin binRight	= new Bin(0, Vector3Int.one);
 			Bin binLeft		= new Bin(0, Vector3Int.one);
@@ -250,44 +250,43 @@ public static class VoxelMeshFactory
 			Bin binFore		= new Bin(0, Vector3Int.one);
 			Bin binBack		= new Bin(0, Vector3Int.one);
 
-			binRight.SetAllVoxelExists(hasNeighborRight);
-			binLeft.SetAllVoxelExists(hasNeighborLeft);
-			binUp.SetAllVoxelExists(hasNeighborUp);
-			binDown.SetAllVoxelExists(hasNeighborDown);
-			binFore.SetAllVoxelExists(hasNeighborFore);
-			binBack.SetAllVoxelExists(hasNeighborBack);
+			binRight= Bin.SetBinAllVoxelsExists(binRight,	hasNeighborRight);
+			binLeft	= Bin.SetBinAllVoxelsExists(binLeft,		hasNeighborLeft);
+			binUp	= Bin.SetBinAllVoxelsExists(binUp,		hasNeighborUp);
+			binDown	= Bin.SetBinAllVoxelsExists(binDown,		hasNeighborDown);
+			binFore	= Bin.SetBinAllVoxelsExists(binFore,		hasNeighborFore);
+			binBack = Bin.SetBinAllVoxelsExists(binBack,		hasNeighborBack);
 
-			bin.RefreshConnectivity(binRight, binLeft, binUp, binDown, binFore, binBack);
-			return bin;
+			return Bin.RefreshConnectivityInBin(bin, binRight, binLeft, binUp, binDown, binFore, binBack);
 		}
 
 		Bin bin;
 
-		bin = GetNewBin(isFilled: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false);
+		bin = GetNewBin(exists: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false);
 		Debug.LogFormat("GetID Results, No neighbors: " + System.Convert.ToString((long)GetID(bin), 2));
 
-		bin = GetNewBin(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+		bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, All neighbors: " + System.Convert.ToString((long)GetID(bin), 2));
 
-		bin = GetNewBin(isFilled: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+		bin = GetNewBin(exists: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results: No neighbors right" + System.Convert.ToString((long)GetID(bin), 2));
 
-		bin = GetNewBin(isFilled: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+		bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No neighbors left: " + System.Convert.ToString((long)GetID(bin), 2));
 
-		bin = GetNewBin(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+		bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No neighbors up: " + System.Convert.ToString((long)GetID(bin), 2));
 
-		bin = GetNewBin(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true);
+		bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No neighbors down: " + System.Convert.ToString((long)GetID(bin), 2));
 
-		bin = GetNewBin(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true);
+		bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No neighbors fore: " + System.Convert.ToString((long)GetID(bin), 2));
 
-		bin = GetNewBin(isFilled: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false);
+		bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false);
 		Debug.LogFormat("GetID Results, No neighbors back: " + System.Convert.ToString((long)GetID(bin), 2));
 
-		bin = GetNewBin(isFilled: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+		bin = GetNewBin(exists: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
 		Debug.LogFormat("GetID Results, No filled: " + System.Convert.ToString((long)GetID(bin), 2));
 	}
 }

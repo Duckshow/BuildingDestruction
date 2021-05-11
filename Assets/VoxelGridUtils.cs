@@ -6,16 +6,12 @@ public partial class VoxelGrid
     public static bool TryGetBin(Vector3Int binCoords, Bin[] bins, Vector3Int binGridDimensions, out Bin bin) {
         int index = CoordsToIndex(binCoords, binGridDimensions);
         if(index == -1) {
-            bin = null;
+            bin = new Bin();
             return false;
         }
 
-        return TryGetBin(index, bins, out bin);
-    }
-
-    public static bool TryGetBin(int index, Bin[] bins, out Bin bin) {
         bin = bins[index];
-        return bin != null;
+        return true;
     }
 
     private static bool GetVoxelExists(Vector3Int voxelCoords, Bin[] bins, Vector3Int binGridDimensions) {
@@ -24,8 +20,8 @@ public partial class VoxelGrid
             return false;
         }
 
-        Bin bin;
-        if(!TryGetBin(binIndex, bins, out bin)) {
+        Bin bin = bins[binIndex];
+        if(bin.IsWholeBinEmpty()) {
             return false;
         }
 
@@ -66,10 +62,6 @@ public partial class VoxelGrid
 
         for(int binIndex = 0; binIndex < bins.Length; binIndex++) {
             Bin bin = bins[binIndex];
-
-            if(bin == null) {
-                continue;
-            }
 
             if(bin.IsWholeBinEmpty()) {
                 continue;

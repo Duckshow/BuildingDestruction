@@ -119,7 +119,7 @@ public partial class VoxelGrid
                     Vector3Int globalVoxelCoords = Bin.GetVoxelGlobalCoords(binIndex, localVoxelIndex, binGridDimensions);
 
                     RunTest(globalVoxelCoords, true);
-                    bins[binIndex].SetVoxelExists(localVoxelIndex, exists: false);
+                    Bin.SetBinVoxelExists(bins, binIndex, localVoxelIndex, exists: false);
                     RunTest(globalVoxelCoords, false);
                 }
             }
@@ -137,10 +137,10 @@ public partial class VoxelGrid
         for(int z = 0; z < dimensions.z; z++) {
             for(int y = 0; y < dimensions.y; y++) {
                 for(int x = 0; x < dimensions.x; x++) {
-                    bool isFilled = x == 0 || y == 0 || z == 0 || x == dimensions.x - 1 || y == dimensions.y - 1 || z == dimensions.z - 1;
+                    bool exists = x == 0 || y == 0 || z == 0 || x == dimensions.x - 1 || y == dimensions.y - 1 || z == dimensions.z - 1;
 
                     cluster[binIndex] = new Bin(binIndex, dimensions);
-                    cluster[binIndex].SetAllVoxelExists(isFilled);
+                    Bin.SetBinAllVoxelsExists(cluster, binIndex, exists: exists);
 
                     binIndex++;
                 }

@@ -95,7 +95,7 @@ public class UnitTester : MonoBehaviour
 
         for(int binIndex = 0; binIndex < length; binIndex++) {
             bins[binIndex] = new Bin(binIndex, dimensions);
-            bins[binIndex].SetAllVoxelExists(true);
+            Bin.SetBinAllVoxelsExists(bins, binIndex, true);
         }
 
         return bins;

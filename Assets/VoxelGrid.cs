@@ -12,7 +12,6 @@ public partial class VoxelGrid : MonoBehaviour
 
     private Vector3Int binGridDimensions;
     private Bin[] bins;
-    private bool[] interiorMap;
     
     private const float UPDATE_LATENCY = 0.1f;
     private float timeToUpdate;
@@ -35,7 +34,9 @@ public partial class VoxelGrid : MonoBehaviour
             int binCount = binGridDimensions.x * binGridDimensions.y * binGridDimensions.z;
 
             bins = new Bin[binCount];
-            interiorMap = new bool[binCount];
+            for(int i = 0; i < binCount; i++) {
+                bins[i] = new Bin(i, binGridDimensions);
+            }
 
             int minX = Bin.WIDTH - 1;
             int minY = Bin.WIDTH - 1;
@@ -47,42 +48,37 @@ public partial class VoxelGrid : MonoBehaviour
 
             for(int i = 0; i < voxelCount; i++) {
                 Vector3Int voxelCoords = IndexToCoords(i, voxelGridDimensions);
+                Vector3Int binCoords = voxelCoords / Bin.WIDTH;
+                
+                int binIndex = CoordsToIndex(binCoords, binGridDimensions);
 
                 if(voxelCoords.x > minX && voxelCoords.y > minY && voxelCoords.z > minZ && voxelCoords.x < maxX && voxelCoords.y < maxY && voxelCoords.z < maxZ) {
+                    Bin.SetBinIsExterior(bins, binIndex, isExterior: false);
                     continue;
                 }
 
-                Vector3Int binCoords = voxelCoords / Bin.WIDTH;
-                int binIndex = CoordsToIndex(binCoords, binGridDimensions);
-
-                Bin bin = bins[binIndex];
-                if(bin == null) {
-                    bins[binIndex] = new Bin(binIndex, binGridDimensions);
-                    bin = bins[binIndex];
-                }
+                Bin.SetBinIsExterior(bins, binIndex, isExterior: true);
 
                 Vector3Int localVoxelCoords = voxelCoords - binCoords * Bin.WIDTH;
                 int localVoxelIndex = CoordsToIndex(localVoxelCoords, Bin.WIDTH);
 
-                bin.SetVoxelExists(localVoxelIndex, exists: true);
+                Bin.SetBinVoxelExists(bins, binIndex, localVoxelIndex, exists: true);
             }
 
             for(int i = 0; i < bins.Length; i++) {
                 Bin bin = bins[i];
 
-                interiorMap[i] = bin == null || bin.IsWholeBinEmpty();
-
-                if(bin == null) {
+                if(bin.IsWholeBinEmpty()) {
                     continue;
                 }
 
-                bin.RefreshConnectivity(bins, binGridDimensions);
+                Bin.RefreshConnectivityInBin(bins, i, binGridDimensions);
             }
 
             // this just ensures that the initial building will be in the same spot as it was placed in the editor - a bit ugly, but I haven't figured out anything better yet
             meshTransform.localPosition = new Vector3(-(voxelGridDimensions.x / 2f), 0.5f, -(voxelGridDimensions.z / 2f));
 
-            ApplyCluster(new VoxelCluster(bins, interiorMap, Vector3Int.zero, binGridDimensions));
+            ApplyCluster(new VoxelCluster(bins, Vector3Int.zero, binGridDimensions));
         }
     }
 
@@ -102,7 +98,6 @@ public partial class VoxelGrid : MonoBehaviour
 
         binGridDimensions = voxelCluster.Dimensions;
         bins = voxelCluster.Bins;
-        interiorMap = voxelCluster.InteriorMap;
 
         voxelBuilder.Refresh();
     }
@@ -156,8 +151,8 @@ public partial class VoxelGrid : MonoBehaviour
         return TryGetBin(coords, bins, binGridDimensions, out bin);
     }
 
-    public bool TryGetBin(int index, out Bin bin) {
-        return TryGetBin(index, bins, out bin);
+    public Bin GetBin(int index) {
+        return bins[index];
     }
 
     private bool GetVoxelExists(Vector3Int voxelCoords) {
@@ -170,30 +165,25 @@ public partial class VoxelGrid : MonoBehaviour
             return;
         }
 
-        Bin bin;
-        if(!TryGetBin(binIndex, bins, out bin)) {
-            return;
-        }
-
-        bin.SetVoxelExists(localVoxelIndex, exists);
+        Bin.SetBinVoxelExists(bins, binIndex, localVoxelIndex, exists);
         
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.None,         bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Right,        bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Left,         bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Up,           bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Down,         bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Fore,         bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Back,         bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpRight,      bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpLeft,       bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpFore,       bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpBack,       bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownRight,    bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownLeft,     bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownFore,     bins, interiorMap, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownBack,     bins, interiorMap, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.None,         bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Right,        bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Left,         bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Up,           bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Down,         bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Fore,         bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Back,         bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpRight,      bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpLeft,       bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpFore,       bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpBack,       bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownRight,    bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownLeft,     bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownFore,     bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownBack,     bins, binGridDimensions, dirtyBins);
 
-        static void TryGetOrCreateVoxelAndSetDirty(Vector3Int voxelCoords, Direction direction, Bin[] bins, bool[] interiorMap, Vector3Int binGridDimensions, Queue<int> dirtyBins) {
+        static void TryGetOrCreateVoxelAndSetDirty(Vector3Int voxelCoords, Direction direction, Bin[] bins, Vector3Int binGridDimensions, Queue<int> dirtyBins) {
             voxelCoords += Utils.GetDirectionVector(direction);
 
             int binIndex, localVoxelIndex;
@@ -201,20 +191,24 @@ public partial class VoxelGrid : MonoBehaviour
                 return;
             }
 
-            Bin neighborBin;
-            if(!TryGetBin(binIndex, bins, out neighborBin)) {
-                if(!interiorMap[binIndex]) {
+            Bin neighborBin = bins[binIndex];
+            if(neighborBin.IsWholeBinEmpty() && neighborBin.IsExterior) {
+                return;
+            }
+
+            if(neighborBin.IsWholeBinEmpty()) {
+                if(neighborBin.IsExterior) {
                     return;
                 }
 
                 bins[binIndex] = new Bin(binIndex, binGridDimensions);
                 neighborBin = bins[binIndex];
 
-                neighborBin.SetAllVoxelExists(true);
+                Bin.SetBinAllVoxelsExists(bins, binIndex, exists: true);
             }
 
             bool wasBinAlreadyDirty = neighborBin.IsDirty();
-            neighborBin.SetVoxelDirty(localVoxelIndex);
+            Bin.SetBinVoxelDirty(bins, binIndex, localVoxelIndex);
 
             if(wasBinAlreadyDirty) {
                 return;
@@ -224,19 +218,14 @@ public partial class VoxelGrid : MonoBehaviour
         }
     }
 
-    public bool IsBinInterior(int binIndex) {
-        return interiorMap[binIndex];
-    }
-
     public void UpdateDirtyBinsAndVoxels() {
         Queue<int> newlyCleanedBins = new Queue<int>();
 
         while(dirtyBins.Count > 0) {
             int binIndex = dirtyBins.Dequeue();
 
-            Bin bin = bins[binIndex];
-            bin.RefreshConnectivity(bins, binGridDimensions);
-            bin.SetClean();
+            Bin.RefreshConnectivityInBin(bins, binIndex, binGridDimensions);
+            Bin.SetBinClean(bins, binIndex);
 
             newlyCleanedBins.Enqueue(binIndex);
         }

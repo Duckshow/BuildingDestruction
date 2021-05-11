@@ -1,7 +1,7 @@
 using UnityEngine;
 using System;
 
-public partial class Bin {
+public readonly partial struct Bin {
     public const int WIDTH = 2; //! WARNING: WIDTH is hardcoded in many places, changing this will require a lot of work!
     public const int SIZE = 8; // must be WIDTH ^ 3
 
@@ -18,32 +18,32 @@ public partial class Bin {
         new Vector3Int(1, 1, 1)
     };
 
-    private const int INDEX_LOOKUP_0_0_0 = 0;
-    private const int INDEX_LOOKUP_1_0_0 = 1;
-    private const int INDEX_LOOKUP_0_1_0 = 2;
-    private const int INDEX_LOOKUP_1_1_0 = 3;
-    private const int INDEX_LOOKUP_0_0_1 = 4;
-    private const int INDEX_LOOKUP_1_0_1 = 5;
-    private const int INDEX_LOOKUP_0_1_1 = 6;
-    private const int INDEX_LOOKUP_1_1_1 = 7;
+    public readonly int Index;
+    public readonly Vector3Int Coords;
+    public readonly bool IsExterior;
 
-    public int Index { get; private set; }
-    public Vector3Int Coords { get; private set; }
-
-    private byte voxels;
-    private byte areVoxelsDirty;
-    private byte voxelNeighborsRightLeft;
-    private byte voxelNeighborsUpDown;
-    private byte voxelNeighborsForeBack;
+    private readonly byte voxels;
+    private readonly byte areVoxelsDirty;
+    private readonly byte voxelNeighborsRightLeft; // TODO: do I really need this? can't I just check connections like I do know, but just save whether or not it was successful?
+    private readonly byte voxelNeighborsUpDown;
+    private readonly byte voxelNeighborsForeBack;
 
     public Bin(int index, Vector3Int binGridDimensions) {
         Index = index;
         Coords = VoxelGrid.IndexToCoords(index, binGridDimensions);
+        IsExterior = false;
+
+        voxels = 0;
+        areVoxelsDirty = 0;
+        voxelNeighborsRightLeft = 0;
+        voxelNeighborsUpDown = 0;
+        voxelNeighborsForeBack = 0;
     }
 
-    public Bin(int index, Vector3Int binGridDimensions, Bin bin) {
+    public Bin(Bin bin, int index, Vector3Int binGridDimensions) {
         Index = index;
         Coords = VoxelGrid.IndexToCoords(index, binGridDimensions);
+        IsExterior = bin.IsExterior;
 
         voxels = bin.voxels;
         areVoxelsDirty = bin.areVoxelsDirty;
@@ -51,6 +51,45 @@ public partial class Bin {
         voxelNeighborsRightLeft = bin.voxelNeighborsRightLeft;
         voxelNeighborsUpDown = bin.voxelNeighborsUpDown;
         voxelNeighborsForeBack = bin.voxelNeighborsForeBack;
+    }
+
+    private Bin(Bin bin, bool isExterior) {
+        Index = bin.Index;
+        Coords = bin.Coords;
+        IsExterior = isExterior;
+
+        voxels = bin.voxels;
+        areVoxelsDirty = bin.areVoxelsDirty;
+
+        voxelNeighborsRightLeft = bin.voxelNeighborsRightLeft;
+        voxelNeighborsUpDown = bin.voxelNeighborsUpDown;
+        voxelNeighborsForeBack = bin.voxelNeighborsForeBack;
+    }
+
+    private Bin(Bin bin, byte voxels, byte areVoxelsDirty) {
+        Index = bin.Index;
+        Coords = bin.Coords;
+        IsExterior = bin.IsExterior;
+
+        this.voxels = voxels;
+        this.areVoxelsDirty = areVoxelsDirty;
+
+        voxelNeighborsRightLeft = bin.voxelNeighborsRightLeft;
+        voxelNeighborsUpDown = bin.voxelNeighborsUpDown;
+        voxelNeighborsForeBack = bin.voxelNeighborsForeBack;
+    }
+
+    private Bin(Bin bin, byte voxelNeighborsRightLeft, byte voxelNeighborsUpDown, byte voxelNeighborsForeBack) {
+        Index = bin.Index;
+        Coords = bin.Coords;
+        IsExterior = bin.IsExterior;
+
+        voxels = bin.voxels;
+        areVoxelsDirty = bin.areVoxelsDirty;
+
+        this.voxelNeighborsRightLeft = voxelNeighborsRightLeft;
+        this.voxelNeighborsUpDown = voxelNeighborsUpDown;
+        this.voxelNeighborsForeBack = voxelNeighborsForeBack;
     }
 
     public bool HasOpenPathBetweenFaces(Direction face1, Direction face2) {
@@ -83,22 +122,6 @@ public partial class Bin {
         return (~voxels & targetVoxels1 & targetVoxels2) > 0;
     }
 
-    //public bool HasVoxelOnFace(Direction face) {
-    //    for(int i = 0; i < VOXELS_PER_FACE; i++) {
-    //        int localVoxelIndex = FaceVoxelIndexToLocalVoxelIndex(i, face);
-    //        bool voxelExists = GetVoxelExists(localVoxelIndex);
-
-    //        if(lookForEmptyVoxel && !voxelExists) {
-    //            return true;
-    //        }
-    //        if(!lookForEmptyVoxel && voxelExists) {
-    //            return true;
-    //        }
-    //    }
-
-    //    return false;
-    //}
-
     public bool IsConnectedToNeighbor(Bin neighbor, Direction direction) {
         Direction oppositeDirection = Utils.GetOppositeDirection(direction);
 
@@ -124,8 +147,16 @@ public partial class Bin {
         return areVoxelsDirty > 0;
     }
 
-    public void SetClean() {
-        areVoxelsDirty = 0;
+    public bool GetVoxelExists(int localVoxelIndex) {
+        return Utils.GetValueFromByte(voxels, localVoxelIndex);
+    }
+
+    public bool GetVoxelHasNeighbor(int localVoxelIndex, Direction direction) {
+        return GetVoxelHasNeighbor(localVoxelIndex, direction, voxels, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
+    }
+
+    private byte GetCachedVoxelNeighbors(Direction direction) {
+        return GetCachedVoxelNeighbors(direction, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
     }
 
     public static Vector3 GetVoxelWorldPos(int binIndex, int localVoxelIndex, Vector3Int binGridDimensions, Transform meshTransform) {
@@ -140,42 +171,60 @@ public partial class Bin {
         return LOCAL_COORDS_LOOKUP[localVoxelIndex];
     }
 
-    public bool GetVoxelExists(int localVoxelIndex) {
-        return Utils.GetValueFromByte(voxels, localVoxelIndex);
+    public static void SetBinVoxelExists(Bin[] bins, int binIndex, int localVoxelIndex, bool exists) {
+        bins[binIndex] = SetBinVoxelExists(bins[binIndex], localVoxelIndex, exists);
     }
 
-    public void SetVoxelExists(int localVoxelIndex, bool exists) {
+    public static Bin SetBinVoxelExists(Bin bin, int localVoxelIndex, bool exists) {
+        byte voxels = bin.voxels;
         Utils.SetValueInByte(ref voxels, localVoxelIndex, exists);
+
+        return new Bin(bin, voxels, bin.areVoxelsDirty);
     }
 
-    public void SetAllVoxelExists(bool exists) {
-        voxels = exists ? byte.MaxValue : byte.MinValue;
+    public static void SetBinAllVoxelsExists(Bin[] bins, int index, bool exists) {
+        bins[index] = SetBinAllVoxelsExists(bins[index], exists);
     }
 
-    public void SetVoxelDirty(int localVoxelIndex) {
+    public static Bin SetBinAllVoxelsExists(Bin bin, bool exists) {
+        return new Bin(bin, voxels: exists ? byte.MaxValue : byte.MinValue, bin.areVoxelsDirty);
+    }
+
+    public static void SetBinClean(Bin[] bins, int index) {
+        bins[index] = new Bin(bins[index], bins[index].voxels, areVoxelsDirty: 0);
+    }
+
+    public static void SetBinVoxelDirty(Bin[] bins, int binIndex, int localVoxelIndex) {
+        Bin bin = bins[binIndex];
+
+        byte areVoxelsDirty = bin.areVoxelsDirty;
         Utils.SetValueInByte(ref areVoxelsDirty, localVoxelIndex, true);
+
+        bins[binIndex] = new Bin(bin, bin.voxels, areVoxelsDirty);
     }
 
-    public void RefreshConnectivity(Bin[] bins, Vector3Int binGridDimensions) {
+    public static void SetBinIsExterior(Bin[] bins, int index, bool isExterior) {
+        bins[index] = new Bin(bins[index], isExterior);
+    }
+
+    public static void RefreshConnectivityInBin(Bin[] bins, int binIndex, Vector3Int binGridDimensions) {
+        Bin bin = bins[binIndex];
+
         Bin binRight, binLeft, binUp, binDown, binFore, binBack;
-        VoxelGrid.TryGetBin(Coords + Vector3Int.right,      bins, binGridDimensions, out binRight);
-        VoxelGrid.TryGetBin(Coords + Vector3Int.left,       bins, binGridDimensions, out binLeft);
-        VoxelGrid.TryGetBin(Coords + Vector3Int.up,         bins, binGridDimensions, out binUp);
-        VoxelGrid.TryGetBin(Coords + Vector3Int.down,       bins, binGridDimensions, out binDown);
-        VoxelGrid.TryGetBin(Coords + Vector3Int.forward,    bins, binGridDimensions, out binFore);
-        VoxelGrid.TryGetBin(Coords + Vector3Int.back,       bins, binGridDimensions, out binBack);
+        VoxelGrid.TryGetBin(bin.Coords + Vector3Int.right,      bins, binGridDimensions, out binRight);
+        VoxelGrid.TryGetBin(bin.Coords + Vector3Int.left,       bins, binGridDimensions, out binLeft);
+        VoxelGrid.TryGetBin(bin.Coords + Vector3Int.up,         bins, binGridDimensions, out binUp);
+        VoxelGrid.TryGetBin(bin.Coords + Vector3Int.down,       bins, binGridDimensions, out binDown);
+        VoxelGrid.TryGetBin(bin.Coords + Vector3Int.forward,    bins, binGridDimensions, out binFore);
+        VoxelGrid.TryGetBin(bin.Coords + Vector3Int.back,       bins, binGridDimensions, out binBack);
 
-        RefreshConnectivity(binRight, binLeft, binUp, binDown, binFore, binBack, out voxelNeighborsRightLeft, out voxelNeighborsUpDown, out voxelNeighborsForeBack);
+        bins[binIndex] = RefreshConnectivityInBin(bin, binRight, binLeft, binUp, binDown, binFore, binBack);
     }
 
-    public void RefreshConnectivity(Bin binRight, Bin binLeft, Bin binUp, Bin binDown, Bin binFore, Bin binBack) {
-        RefreshConnectivity(binRight, binLeft, binUp, binDown, binFore, binBack, out voxelNeighborsRightLeft, out voxelNeighborsUpDown, out voxelNeighborsForeBack);
-    }
-
-    private static void RefreshConnectivity(Bin binRight, Bin binLeft, Bin binUp, Bin binDown, Bin binFore, Bin binBack, out byte voxelNeighborsRightLeft, out byte voxelNeighborsUpDown, out byte voxelNeighborsForeBack) {
-        voxelNeighborsRightLeft = 0;
-        voxelNeighborsUpDown = 0;
-        voxelNeighborsForeBack = 0;
+    public static Bin RefreshConnectivityInBin(Bin bin, Bin binRight, Bin binLeft, Bin binUp, Bin binDown, Bin binFore, Bin binBack) {
+        byte voxelNeighborsRightLeft = 0;
+        byte voxelNeighborsUpDown = 0;
+        byte voxelNeighborsForeBack = 0;
 
         TryAddVoxelNeighbors(ref voxelNeighborsRightLeft, binRight, Direction.Right, bitOffset: 0);
         TryAddVoxelNeighbors(ref voxelNeighborsRightLeft, binLeft, Direction.Left, bitOffset: VOXELS_PER_FACE);
@@ -183,9 +232,8 @@ public partial class Bin {
         TryAddVoxelNeighbors(ref voxelNeighborsUpDown, binDown, Direction.Down, bitOffset: VOXELS_PER_FACE);
         TryAddVoxelNeighbors(ref voxelNeighborsForeBack, binFore, Direction.Fore, bitOffset: 0);
         TryAddVoxelNeighbors(ref voxelNeighborsForeBack, binBack, Direction.Back, bitOffset: VOXELS_PER_FACE);
-
         static void TryAddVoxelNeighbors(ref byte axisVoxelNeighbors, Bin neighborBin, Direction binDirection, byte bitOffset) {
-            if(neighborBin == null) {
+            if(neighborBin.IsWholeBinEmpty()) {
                 return;
             }
 
@@ -198,10 +246,8 @@ public partial class Bin {
                 Utils.SetValueInByte(ref axisVoxelNeighbors, bitOffset + i, hasVoxelNeighbor);
             }
         }
-    }
 
-    public bool GetVoxelHasNeighbor(int localVoxelIndex, Direction direction) {
-        return GetVoxelHasNeighbor(localVoxelIndex, direction, voxels, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
+        return new Bin(bin, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
     }
 
     private static bool GetVoxelHasNeighbor(int localVoxelIndex, Direction direction, byte binVoxels, byte voxelNeighborsRightLeft, byte voxelNeighborsUpDown, byte voxelNeighborsForeBack) {
@@ -217,10 +263,6 @@ public partial class Bin {
 
         int neighborLocalVoxelIndex = VoxelGrid.CoordsToIndex(neighborCoords, WIDTH);
         return Utils.GetValueFromByte(binVoxels, neighborLocalVoxelIndex);
-    }
-
-    private byte GetCachedVoxelNeighbors(Direction direction) {
-        return GetCachedVoxelNeighbors(direction, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
     }
 
     private static byte GetCachedVoxelNeighbors(Direction direction, byte voxelNeighborsRightLeft, byte voxelNeighborsUpDown, byte voxelNeighborsForeBack) {

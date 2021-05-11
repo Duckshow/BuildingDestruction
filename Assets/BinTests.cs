@@ -1,73 +1,93 @@
 using UnityEngine;
 using System;
 
-public partial class Bin {
+public readonly partial struct Bin {
 
     public static void RunTests() {
-        TestRefreshConnectivity();
+        TestRefreshConnectivityInBin();
         TestGetVoxelHasNeighbor();
         TestGetCachedVoxelNeighbors();
         TestHasOpenPathBetweenFaces();
         Debug.Log("Tests done.");
     }
 
-    private static void TestRefreshConnectivity() {
-        static void RunTest(Bin binRight, Bin binLeft, Bin binUp, Bin binDown, Bin binFore, Bin binBack, byte expectedResultsRightLeft, byte expectedResultsUpDown, byte expectedResultsForeBack) {
-            UnitTester.Assert<Bin, byte>(
-               "RefreshConnectivity",
-               RefreshConnectivity,
-               new UnitTester.Parameter("BinRight", binRight),
-               new UnitTester.Parameter("BinLeft", binLeft),
-               new UnitTester.Parameter("BinUp", binUp),
-               new UnitTester.Parameter("BinDown", binDown),
-               new UnitTester.Parameter("BinFore", binFore),
-               new UnitTester.Parameter("BinBack", binBack),
-               expectedResultsRightLeft,
-               expectedResultsUpDown,
-               expectedResultsForeBack
+    private static void TestRefreshConnectivityInBin() {
+        static void RunTest(Bin[] bins, int binIndex, Vector3Int binGridDimensions, byte expectedResultsRightLeft, byte expectedResultsUpDown, byte expectedResultsForeBack) {
+            RefreshConnectivityInBin(bins, binIndex, binGridDimensions);
+
+            UnitTester.Assert(
+               "RefreshConnectivityInBin, Right + Left",
+               bins[binIndex].voxelNeighborsRightLeft == expectedResultsRightLeft,
+               true,
+               new UnitTester.Parameter("Bins", bins),
+               new UnitTester.Parameter("Index", binIndex),
+               new UnitTester.Parameter("Dimensions", binGridDimensions)
+           );
+
+            UnitTester.Assert(
+               "RefreshConnectivityInBin, Up + Down",
+               bins[binIndex].voxelNeighborsUpDown == expectedResultsUpDown,
+               true,
+               new UnitTester.Parameter("Bins", bins),
+               new UnitTester.Parameter("Index", binIndex),
+               new UnitTester.Parameter("Dimensions", binGridDimensions)
+           );
+
+            UnitTester.Assert(
+               "RefreshConnectivityInBin, Fore + Back",
+               bins[binIndex].voxelNeighborsForeBack == expectedResultsForeBack,
+               true,
+               new UnitTester.Parameter("Bins", bins),
+               new UnitTester.Parameter("Index", binIndex),
+               new UnitTester.Parameter("Dimensions", binGridDimensions)
            );
         }
 
         Vector3Int binGridDimensions = new Vector3Int(3, 3, 3);
-        Bin binRight = new Bin(14, binGridDimensions);
-        Bin binLeft = new Bin(12, binGridDimensions);
-        Bin binUp = new Bin(16, binGridDimensions);
-        Bin binDown = new Bin(10, binGridDimensions);
-        Bin binFore = new Bin(22, binGridDimensions);
-        Bin binBack = new Bin(4, binGridDimensions);
+        Bin[] bins = UnitTester.GetBinsForTesting(binGridDimensions);
 
-        RunTest(binRight, binLeft, binUp, binDown, binFore, binBack,
-            expectedResultsRightLeft: 0b_0000_0000,
-            expectedResultsUpDown: 0b_0000_0000,
-            expectedResultsForeBack: 0b_0000_0000
+        Vector3Int binToTestCoords = new Vector3Int(1, 1, 1);
+        int binToTestIndex = VoxelGrid.CoordsToIndex(binToTestCoords, binGridDimensions);
+
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.right,   binGridDimensions), false);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.left,    binGridDimensions), false);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.up,      binGridDimensions), false);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.down,    binGridDimensions), false);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.forward, binGridDimensions), false);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.back,    binGridDimensions), false);
+
+        RunTest(bins, binToTestIndex, binGridDimensions,
+            expectedResultsRightLeft:   0b_0000_0000,
+            expectedResultsUpDown:      0b_0000_0000,
+            expectedResultsForeBack:    0b_0000_0000
         );
 
-        binRight.SetAllVoxelExists(true);
-        binLeft.SetAllVoxelExists(true);
-        binUp.SetAllVoxelExists(true);
-        binDown.SetAllVoxelExists(true);
-        binFore.SetAllVoxelExists(true);
-        binBack.SetAllVoxelExists(true);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.right,   binGridDimensions), true);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.left,    binGridDimensions), true);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.up,      binGridDimensions), true);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.down,    binGridDimensions), true);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.forward, binGridDimensions), true);
+        SetBinAllVoxelsExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.back,    binGridDimensions), true);
 
-        RunTest(binRight, binLeft, binUp, binDown, binFore, binBack,
-            expectedResultsRightLeft: 0b_1111_1111,
-            expectedResultsUpDown: 0b_1111_1111,
-            expectedResultsForeBack: 0b_1111_1111
+        RunTest(bins, binToTestIndex, binGridDimensions,
+            expectedResultsRightLeft:   0b_1111_1111,
+            expectedResultsUpDown:      0b_1111_1111,
+            expectedResultsForeBack:    0b_1111_1111
         );
 
         for(int i = 0; i < SIZE; i++) {
-            binRight.SetVoxelExists(i, LOCAL_COORDS_LOOKUP[i].y == 0);
-            binLeft.SetVoxelExists(i, LOCAL_COORDS_LOOKUP[i].y == WIDTH - 1);
-            binUp.SetVoxelExists(i, LOCAL_COORDS_LOOKUP[i].z == 0);
-            binDown.SetVoxelExists(i, LOCAL_COORDS_LOOKUP[i].z == WIDTH - 1);
-            binFore.SetVoxelExists(i, LOCAL_COORDS_LOOKUP[i].x == 0);
-            binBack.SetVoxelExists(i, LOCAL_COORDS_LOOKUP[i].x == WIDTH - 1);
+            SetBinVoxelExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.right,   binGridDimensions), i, LOCAL_COORDS_LOOKUP[i].y == 0);
+            SetBinVoxelExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.left,    binGridDimensions), i, LOCAL_COORDS_LOOKUP[i].y == WIDTH - 1);
+            SetBinVoxelExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.up,      binGridDimensions), i, LOCAL_COORDS_LOOKUP[i].z == 0);
+            SetBinVoxelExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.down,    binGridDimensions), i, LOCAL_COORDS_LOOKUP[i].z == WIDTH - 1);
+            SetBinVoxelExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.forward, binGridDimensions), i, LOCAL_COORDS_LOOKUP[i].x == 0);
+            SetBinVoxelExists(bins, VoxelGrid.CoordsToIndex(binToTestCoords + Vector3Int.back,    binGridDimensions), i, LOCAL_COORDS_LOOKUP[i].x == WIDTH - 1);
         }
 
-        RunTest(binRight, binLeft, binUp, binDown, binFore, binBack,
-            expectedResultsRightLeft: 0b_1010_0101,
-            expectedResultsUpDown: 0b_1100_0011,
-            expectedResultsForeBack: 0b_1010_0101
+        RunTest(bins, binToTestIndex, binGridDimensions,
+            expectedResultsRightLeft:   0b_1010_0101,
+            expectedResultsUpDown:      0b_1100_0011,
+            expectedResultsForeBack:    0b_1010_0101
         );
     }
 
@@ -229,8 +249,8 @@ public partial class Bin {
 
     private static void TestHasOpenPathBetweenFaces() {
         Bin bin = new Bin(0, new Vector3Int(3, 3, 3));
-
-        bin.SetAllVoxelExists(false);
+        
+        bin = SetBinAllVoxelsExists(bin, exists: false);
 
         for(int i0 = 0; i0 < 6; i0++) {
             for(int i1 = 0; i1 < 6; i1++) {
@@ -248,7 +268,7 @@ public partial class Bin {
             }
         }
 
-        bin.SetAllVoxelExists(true);
+        bin = SetBinAllVoxelsExists(bin, exists: true);
 
         for(int i0 = 0; i0 < 6; i0++) {
             for(int i1 = 0; i1 < 6; i1++) {
@@ -267,8 +287,8 @@ public partial class Bin {
         }
 
         for(int i = 0; i < SIZE; i++) {
-            bin.SetAllVoxelExists(true);
-            bin.SetVoxelExists(i, false);
+            bin = SetBinAllVoxelsExists(bin, exists: true);
+            bin = SetBinVoxelExists(bin, i, exists: false);
 
             Vector3Int coords = LOCAL_COORDS_LOOKUP[i];
 
@@ -314,9 +334,9 @@ public partial class Bin {
                         int index1 = FaceVoxelIndexToLocalVoxelIndex(i2, face1);
                         int index2 = FaceVoxelIndexToLocalVoxelIndex(i2, face2);
 
-                        bin.SetAllVoxelExists(true);
-                        bin.SetVoxelExists(index1, false);
-                        bin.SetVoxelExists(index2, false);
+                        bin = SetBinAllVoxelsExists(bin, exists: true);
+                        bin = SetBinVoxelExists(bin, index1, exists: false);
+                        bin = SetBinVoxelExists(bin, index2, exists: false);
 
                         UnitTester.Assert<Direction, Direction, bool>(
                             string.Format("HasOpenPathBetweenFaces, Voxel #{0} and #{1} removed", index1, index2),
@@ -341,9 +361,9 @@ public partial class Bin {
                         int index1 = FaceVoxelIndexToLocalVoxelIndex(i2, face1);
                         int index2 = FaceVoxelIndexToLocalVoxelIndex((VOXELS_PER_FACE - 1) - i2, face2);
 
-                        bin.SetAllVoxelExists(true);
-                        bin.SetVoxelExists(index1, false);
-                        bin.SetVoxelExists(index2, false);
+                        bin = SetBinAllVoxelsExists(bin, exists: true);
+                        bin = SetBinVoxelExists(bin, index1, exists: false);
+                        bin = SetBinVoxelExists(bin, index2, exists: false);
 
                         UnitTester.Assert<Direction, Direction, bool>(
                             string.Format("HasOpenPathBetweenFaces, Voxel #{0} and #{1} removed", index1, index2),

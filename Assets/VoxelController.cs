@@ -47,13 +47,13 @@ public class VoxelController : MonoBehaviour {
 
 		Bounds b = new Bounds(Vector3.zero, Vector3.one);
 		for(int binIndex = 0; binIndex < voxelGrid.GetBinCount(); binIndex++) {
-			Bin bin;
-            if(!voxelGrid.TryGetBin(binIndex, out bin) && !voxelGrid.IsBinInterior(binIndex)) {
+			Bin bin = voxelGrid.GetBin(binIndex);
+            if(bin.IsWholeBinEmpty() && bin.IsExterior) {
 				continue;
             }
 
             for(int localVoxelIndex = 0; localVoxelIndex < Bin.SIZE; localVoxelIndex++) {
-				if(bin != null && !bin.GetVoxelExists(localVoxelIndex)) {
+				if(!bin.IsWholeBinEmpty() && !bin.GetVoxelExists(localVoxelIndex)) {
 					continue;
 				}
 

@@ -6,7 +6,7 @@ public static partial class VoxelClusterHandler {
         TestGetBiggestVoxelClusterIndex();
         TestTryFindCluster();
         TestMoveBinsToNewGrid();
-        TestGetInteriorMap();
+        TestMarkExteriorBins();
         Debug.Log("Tests done.");
     }
     
@@ -305,16 +305,16 @@ public static partial class VoxelClusterHandler {
         void AddBin(Vector3Int newBinCoords) {
             int binIndex = VoxelGrid.CoordsToIndex(newBinCoords, binGridDimensions);
             bins[binIndex] = new Bin(binIndex, binGridDimensions);
-            bins[binIndex].SetAllVoxelExists(true);
+            Bin.SetBinAllVoxelsExists(bins, binIndex, exists: true);
         }
 
         static void RefreshBinGridConnectivity(Bin[] bins, Vector3Int binGridDimensions) {
             for(int i = 0; i < bins.Length; i++) {
-                if(bins[i] == null) {
+                if(bins[i].IsWholeBinEmpty()) {
                     continue;
                 }
 
-                bins[i].RefreshConnectivity(bins, binGridDimensions);
+                Bin.RefreshConnectivityInBin(bins, i, binGridDimensions);
             }
         }
     }
@@ -380,24 +380,23 @@ public static partial class VoxelClusterHandler {
         }
     }
 
-    private static void TestGetInteriorMap() { // this code is horse shit, just toss it out if you run into problems
+    private static void TestMarkExteriorBins() { // this code is horse shit, just toss it out if you run into problems
         Vector3Int binGridDimensions = new Vector3Int(5, 5, 5);
         Bin[] bins;
-        bool[] interiorMap;
-        bool[] expectedInteriorMap;
+        bool[] expectedMarkings;
         List<Vector3Int> tweakedBins;
 
         // test #1
         bins = UnitTester.GetBinsForTesting(binGridDimensions);
-        interiorMap = GetInteriorMap(bins, binGridDimensions);
+        MarkExteriorBins(bins, binGridDimensions);
 
-        expectedInteriorMap = new bool[bins.Length];
-        for(int i = 0; i < expectedInteriorMap.Length; i++) {
+        expectedMarkings = new bool[bins.Length];
+        for(int i = 0; i < expectedMarkings.Length; i++) {
             Vector3Int coords = VoxelGrid.IndexToCoords(i, binGridDimensions);
-            expectedInteriorMap[i] = coords.x > 0 && coords.y > 0 && coords.z > 0 && coords.x < binGridDimensions.x - 1 && coords.y < binGridDimensions.y - 1 && coords.z < binGridDimensions.z - 1;
+            expectedMarkings[i] = coords.x == 0 || coords.y == 0 || coords.z == 0 || coords.x == binGridDimensions.x - 1 || coords.y == binGridDimensions.y - 1 || coords.z == binGridDimensions.z - 1;
         }
 
-        VerifyInteriorMap(interiorMap, expectedInteriorMap, binGridDimensions);
+        VerifyMarkings(bins, expectedMarkings, binGridDimensions);
 
         // test #2
         tweakedBins = new List<Vector3Int>() {
@@ -423,13 +422,13 @@ public static partial class VoxelClusterHandler {
         for(int i = 0; i < tweakedBins.Count; i++) {
             Vector3Int coords = tweakedBins[i];
             int index = VoxelGrid.CoordsToIndex(coords, binGridDimensions);
-            bins[index] = null;
+            Bin.SetBinAllVoxelsExists(bins, index, exists: false);
         }
 
-        interiorMap = GetInteriorMap(bins, binGridDimensions);
+        MarkExteriorBins(bins, binGridDimensions);
 
-        expectedInteriorMap = new bool[bins.Length];
-        for(int i = 0; i < expectedInteriorMap.Length; i++) {
+        expectedMarkings = new bool[bins.Length];
+        for(int i = 0; i < expectedMarkings.Length; i++) {
             Vector3Int coords = VoxelGrid.IndexToCoords(i, binGridDimensions);
 
             bool isAtEdge = coords.x == 0 || coords.y == 0 || coords.z == 0 || coords.x == binGridDimensions.x - 1 || coords.y == binGridDimensions.y - 1 || coords.z == binGridDimensions.z - 1;
@@ -441,10 +440,10 @@ public static partial class VoxelClusterHandler {
             bool hasNeighborBeenTweakedFore     = tweakedBins.Contains(coords + Vector3Int.forward);
             bool hasNeighborBeenTweakedBack     = tweakedBins.Contains(coords + Vector3Int.back);
 
-            expectedInteriorMap[i] = !isAtEdge && !hasBeenTweaked && !hasNeighborBeenTweakedRight && !hasNeighborBeenTweakedLeft && !hasNeighborBeenTweakedUp && !hasNeighborBeenTweakedDown && !hasNeighborBeenTweakedFore && !hasNeighborBeenTweakedBack;
+            expectedMarkings[i] = isAtEdge || hasBeenTweaked || hasNeighborBeenTweakedRight || hasNeighborBeenTweakedLeft || hasNeighborBeenTweakedUp || hasNeighborBeenTweakedDown || hasNeighborBeenTweakedFore || hasNeighborBeenTweakedBack;
         }
 
-        VerifyInteriorMap(interiorMap, expectedInteriorMap, binGridDimensions);
+        VerifyMarkings(bins, expectedMarkings, binGridDimensions);
 
         // test #3
         tweakedBins = new List<Vector3Int>() {
@@ -459,26 +458,26 @@ public static partial class VoxelClusterHandler {
         for(int i = 0; i < tweakedBins.Count; i++) {
             Vector3Int coords = tweakedBins[i];
             int index = VoxelGrid.CoordsToIndex(coords, binGridDimensions);
-            bins[index] = null;
+            Bin.SetBinAllVoxelsExists(bins, index, exists: false);
         }
 
-        interiorMap = GetInteriorMap(bins, binGridDimensions);
+        MarkExteriorBins(bins, binGridDimensions);
 
-        expectedInteriorMap = new bool[bins.Length];
-        for(int i = 0; i < expectedInteriorMap.Length; i++) {
+        expectedMarkings = new bool[bins.Length];
+        for(int i = 0; i < expectedMarkings.Length; i++) {
             Vector3Int coords = VoxelGrid.IndexToCoords(i, binGridDimensions);
 
             bool isAtEdge = coords.x == 0 || coords.y == 0 || coords.z == 0 || coords.x == binGridDimensions.x - 1 || coords.y == binGridDimensions.y - 1 || coords.z == binGridDimensions.z - 1;
-            expectedInteriorMap[i] = !isAtEdge;
+            expectedMarkings[i] = isAtEdge;
         }
 
-        VerifyInteriorMap(interiorMap, expectedInteriorMap, binGridDimensions);
+        VerifyMarkings(bins, expectedMarkings, binGridDimensions);
 
-        static void VerifyInteriorMap(bool[] interiorMap, bool[] expectedInteriorMap, Vector3Int binGridDimensions) {
-            Debug.Assert(interiorMap.Length == expectedInteriorMap.Length);
+        static void VerifyMarkings(Bin[] bins, bool[] expectedMarkings, Vector3Int binGridDimensions) {
+            Debug.Assert(bins.Length == expectedMarkings.Length);
 
-            for(int i = 0; i < interiorMap.Length; i++) {
-                Debug.Assert(interiorMap[i] == expectedInteriorMap[i], string.Format("Failed: {0} was {1}, expected {2}!", VoxelGrid.IndexToCoords(i, binGridDimensions), interiorMap[i], expectedInteriorMap[i]));
+            for(int i = 0; i < bins.Length; i++) {
+                Debug.Assert(bins[i].IsExterior == expectedMarkings[i], string.Format("Failed: {0} was {1}, expected {2}!", VoxelGrid.IndexToCoords(i, binGridDimensions), bins[i].IsExterior, expectedMarkings[i]));
             }
         }
     }
