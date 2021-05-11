@@ -97,7 +97,7 @@ public static class VoxelMeshFactory
 		
 		int faceCount = 0;
 		for(int i = 0; i < Bin.SIZE; i++) {
-			if(!bin.GetVoxelIsFilled(i)) {
+			if(!bin.GetVoxelExists(i)) {
 				continue;
             }
 
@@ -124,11 +124,11 @@ public static class VoxelMeshFactory
 		int triIndex = 0;
 
 		for(int i = 0; i < Bin.SIZE; i++) {
-			if(!bin.GetVoxelIsFilled(i)) {
+			if(!bin.GetVoxelExists(i)) {
 				continue;
 			}
 
-			Vector3Int localCoords = bin.GetVoxelLocalCoords(i);
+			Vector3Int localCoords = Bin.GetVoxelLocalCoords(i);
 
 			if(!bin.GetVoxelHasNeighbor(i, Direction.Right))	{ AddFace(localCoords, Direction.Right,	ref faceIndex, ref triIndex, verts, uvs, tris); }
 			if(!bin.GetVoxelHasNeighbor(i, Direction.Left))		{ AddFace(localCoords, Direction.Left,	ref faceIndex, ref triIndex, verts, uvs, tris); }
@@ -187,7 +187,7 @@ public static class VoxelMeshFactory
 			const int SIDES = 6;
 			int offset = i * SIDES;
 
-			if(!bin.GetVoxelIsFilled(i)) {
+			if(!bin.GetVoxelExists(i)) {
 				id |= 0ul << offset + 0;
 				id |= 0ul << offset + 1;
 				id |= 0ul << offset + 2;
@@ -219,16 +219,7 @@ public static class VoxelMeshFactory
 
 	private static void TestGetMesh() {
 		Bin bin = new Bin(0, Vector3Int.one);
-
-		int index = 0;
-        for(int z = 0; z < Bin.WIDTH; z++) {
-            for(int y = 0; y < Bin.WIDTH; y++) {
-                for(int x = 0; x < Bin.WIDTH; x++) {
-					bin.SetVoxelIsFilled(index, isFilled: true);
-					index++;
-				}
-            }
-        }
+		bin.SetAllVoxelExists(true);
 
 		ulong id = GetID(bin);
 
@@ -250,11 +241,23 @@ public static class VoxelMeshFactory
 	private static void TestGetID() {
 		Bin GetNewBin(bool isFilled, bool hasNeighborRight, bool hasNeighborLeft, bool hasNeighborUp, bool hasNeighborDown, bool hasNeighborFore, bool hasNeighborBack) {
 			Bin bin = new Bin(0, Vector3Int.one);
+			bin.SetAllVoxelExists(isFilled);
 
-            for(int i = 0; i < Bin.SIZE; i++) {
-				bin.SetVoxelIsFilled(i, isFilled);
-            }
+			Bin binRight	= new Bin(0, Vector3Int.one);
+			Bin binLeft		= new Bin(0, Vector3Int.one);
+			Bin binUp		= new Bin(0, Vector3Int.one);
+			Bin binDown		= new Bin(0, Vector3Int.one);
+			Bin binFore		= new Bin(0, Vector3Int.one);
+			Bin binBack		= new Bin(0, Vector3Int.one);
 
+			binRight.SetAllVoxelExists(hasNeighborRight);
+			binLeft.SetAllVoxelExists(hasNeighborLeft);
+			binUp.SetAllVoxelExists(hasNeighborUp);
+			binDown.SetAllVoxelExists(hasNeighborDown);
+			binFore.SetAllVoxelExists(hasNeighborFore);
+			binBack.SetAllVoxelExists(hasNeighborBack);
+
+			bin.RefreshConnectivity(binRight, binLeft, binUp, binDown, binFore, binBack);
 			return bin;
 		}
 

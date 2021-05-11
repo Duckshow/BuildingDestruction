@@ -50,7 +50,7 @@ public class VoxelBuilder : MonoBehaviour {
 			}
 		}
 
-		StartCoroutine(WaitThenFinishRefresh(meshes, meshObjects, newLength, dimensions, material));
+ 		StartCoroutine(WaitThenFinishRefresh(meshes, meshObjects, newLength, dimensions, material));
 	}
 
 	private static IEnumerator WaitThenFinishRefresh(Mesh[] meshes, MeshObject[] meshObjects, int newMeshObjectCount, Vector3Int dimensions, Material material) {

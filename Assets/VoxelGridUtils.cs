@@ -3,35 +3,104 @@ using System.Collections.Generic;
 
 public partial class VoxelGrid
 {
-    public Transform GetMeshTransform() {
-        return meshTransform;
-    }
-
-    public bool TryGetBin(Vector3Int coords, out Bin bin) {
-        if(!AreCoordsWithinDimensions(coords, binGridDimensions)) {
+    public static bool TryGetBin(Vector3Int binCoords, Bin[] bins, Vector3Int binGridDimensions, out Bin bin) {
+        int index = CoordsToIndex(binCoords, binGridDimensions);
+        if(index == -1) {
             bin = null;
             return false;
         }
 
-        int index = CoordsToIndex(coords, binGridDimensions);
-        return TryGetBin(index, out bin);
+        return TryGetBin(index, bins, out bin);
     }
 
-    public bool TryGetBin(int index, out Bin bin) {
+    public static bool TryGetBin(int index, Bin[] bins, out Bin bin) {
         bin = bins[index];
         return bin != null;
     }
 
-    public int GetBinCount() {
-        return bins.Length;
+    private static bool GetVoxelExists(Vector3Int voxelCoords, Bin[] bins, Vector3Int binGridDimensions) {
+        int binIndex, localVoxelIndex;
+        if(!GetBinAndVoxelIndex(voxelCoords, bins, binGridDimensions, out binIndex, out localVoxelIndex)) {
+            return false;
+        }
+
+        Bin bin;
+        if(!TryGetBin(binIndex, bins, out bin)) {
+            return false;
+        }
+
+        return bin.GetVoxelExists(localVoxelIndex);
     }
 
-    public Vector3Int GetBinGridDimensions() {
-        return binGridDimensions;
+    private static bool GetBinAndVoxelIndex(Vector3Int voxelCoords, Bin[] bins, Vector3Int binGridDimensions, out int binIndex, out int localVoxelIndex) {
+        Vector3Int binCoords = voxelCoords / Bin.WIDTH;
+        binIndex = CoordsToIndex(binCoords, binGridDimensions);
+
+        if(binIndex == -1) {
+            localVoxelIndex = -1;
+            return false;
+        }
+
+        Vector3Int localVoxelCoords = voxelCoords - binCoords * Bin.WIDTH;
+        localVoxelIndex = CoordsToIndex(localVoxelCoords, Bin.WIDTH);
+
+        return localVoxelIndex != -1;
     }
 
     public static Vector3Int CalculateVoxelGridDimensions(Vector3Int dimensions) {
         return dimensions * Bin.WIDTH;
+    }
+
+    private static Vector3 GetPivot(Bin[] bins, Vector3Int binGridDimensions, bool isStatic) {
+        Vector3 pivot = Vector3.zero;
+        float divisor = 0f;
+
+        static void TryAddToPivot(Vector3 coords, bool isStatic, ref Vector3 pivot, ref float divisor) {
+            if(isStatic && coords.y > Bin.WIDTH - 1) {
+                return;
+            }
+
+            pivot += coords;
+            divisor++;
+        }
+
+        for(int binIndex = 0; binIndex < bins.Length; binIndex++) {
+            Bin bin = bins[binIndex];
+
+            if(bin == null) {
+                continue;
+            }
+
+            if(bin.IsWholeBinEmpty()) {
+                continue;
+            }
+
+            if(bin.IsWholeBinFilled()) {
+                float binCenter = (Bin.WIDTH - 1) / 2f;
+                TryAddToPivot(bin.Coords * Bin.WIDTH + new Vector3(binCenter, binCenter, binCenter), isStatic, ref pivot, ref divisor);
+                continue;
+            }
+
+            for(int localVoxelIndex = 0; localVoxelIndex < Bin.SIZE; localVoxelIndex++) {
+                if(!bin.GetVoxelExists(localVoxelIndex)) {
+                    continue;
+                }
+
+                TryAddToPivot(Bin.GetVoxelGlobalCoords(binIndex, localVoxelIndex, binGridDimensions), isStatic, ref pivot, ref divisor);
+            }
+        }
+
+        if(Mathf.Approximately(divisor, 0f)) {
+            return Vector3.zero;
+        }
+
+
+        pivot /= divisor;
+        if(isStatic) {
+            pivot.y = -0.5f;
+        }
+
+        return pivot;
     }
 
     public static bool AreCoordsWithinDimensions(Vector3Int coords, Vector3Int dimensions) {
@@ -84,143 +153,5 @@ public partial class VoxelGrid
         }
 
         return new Vector3Int(i % widthX, (i / widthX) % widthY, i / (widthX * widthY));
-    }
-
-    public static Vector3Int GetDirectionVector(Direction dir) {
-        switch(dir) {
-            case Direction.None:    return Vector3Int.zero;
-            case Direction.Right:   return Vector3Int.right;
-            case Direction.Left:    return Vector3Int.left;
-            case Direction.Up:      return Vector3Int.up;
-            case Direction.Down:    return Vector3Int.down;
-            case Direction.Fore:    return Vector3Int.forward;
-            case Direction.Back:    return Vector3Int.back;
-            case Direction.UpRight:     return Vector3Int.up + Vector3Int.right;
-            case Direction.UpLeft:      return Vector3Int.up + Vector3Int.left;
-            case Direction.UpFore:      return Vector3Int.up + Vector3Int.forward;
-            case Direction.UpBack:      return Vector3Int.up + Vector3Int.back;
-            case Direction.DownRight:   return Vector3Int.down + Vector3Int.right;
-            case Direction.DownLeft:    return Vector3Int.down + Vector3Int.left;
-            case Direction.DownFore:    return Vector3Int.down + Vector3Int.forward;
-            case Direction.DownBack:    return Vector3Int.down + Vector3Int.back;
-        }
-
-        return Vector3Int.zero;
-    }
-
-    public static Direction GetOppositeDirection(Direction dir) {
-        switch(dir) {
-            case Direction.None:    return Direction.None;
-            case Direction.Right:   return Direction.Left;
-            case Direction.Left:    return Direction.Right;
-            case Direction.Up:      return Direction.Down;
-            case Direction.Down:    return Direction.Up;
-            case Direction.Fore:    return Direction.Back;
-            case Direction.Back:    return Direction.Fore;
-        }
-
-        return Direction.None;
-    }
-
-    private static bool DoesFilledVoxelExist(Vector3Int voxelCoords, Bin[] bins, Vector3Int binGridDimensions) {
-        VoxelAddress address;
-
-        if(!TryGetVoxelAddress(voxelCoords, binGridDimensions, out address)) {
-            return false;
-        }
-
-        if(bins[address.BinIndex] == null) {
-            return false;
-        }
-
-        return bins[address.BinIndex].GetVoxelIsFilled(address.LocalVoxelIndex);
-    }
-
-    private static bool TryGetVoxelAddress(Vector3Int voxelCoords, Vector3Int binGridDimensions, out VoxelAddress address) {
-        Vector3Int voxelGridDimensions = CalculateVoxelGridDimensions(binGridDimensions);
-
-        if(!AreCoordsWithinDimensions(voxelCoords, voxelGridDimensions)) {
-            address = new VoxelAddress(-1, -1);
-            return false;
-        }
-
-        address = VoxelCoordsToVoxelAddress(voxelCoords, binGridDimensions);
-        return true;
-    }
-
-    public static VoxelAddress VoxelCoordsToVoxelAddress(Vector3Int voxelCoords, Vector3Int binGridDimensions) {
-        Vector3Int binGridCoords = voxelCoords / Bin.WIDTH;
-        Vector3Int localVoxelCoords = voxelCoords - binGridCoords * Bin.WIDTH;
-
-        int binIndex = CoordsToIndex(binGridCoords, binGridDimensions);
-        int localVoxelIndex = CoordsToIndex(localVoxelCoords, Bin.WIDTH);
-
-        return new VoxelAddress(binIndex, localVoxelIndex);
-    }
-
-    public static Vector3Int VoxelAddressToVoxelCoords(VoxelAddress address, Vector3Int binGridDimensions) {
-        Vector3Int binCoords = IndexToCoords(address.BinIndex, binGridDimensions);
-        Vector3Int localVoxelCoords = IndexToCoords(address.LocalVoxelIndex, Bin.WIDTH);
-        return binCoords * Bin.WIDTH + localVoxelCoords;
-    }
-
-    public static bool TryGetVoxelAddressNeighbor(VoxelAddress address, Vector3Int binGridDimensions, Direction direction, out VoxelAddress voxelAddress) {
-        Vector3Int dir = GetDirectionVector(direction);
-
-        Vector3Int newBinCoords = IndexToCoords(address.BinIndex, binGridDimensions);
-        Vector3Int newLocalVoxelCoords = IndexToCoords(address.LocalVoxelIndex, Bin.WIDTH) + dir;
-
-        if(newLocalVoxelCoords.x == -1) {
-            newLocalVoxelCoords.x = Bin.WIDTH - 1;
-            newBinCoords.x--;
-        }
-        else if(newLocalVoxelCoords.x == Bin.WIDTH) {
-            newLocalVoxelCoords.x = 0;
-            newBinCoords.x++;
-        }
-
-        if(newLocalVoxelCoords.y == -1) {
-            newLocalVoxelCoords.y = Bin.WIDTH - 1;
-            newBinCoords.y--;
-        }
-        else if(newLocalVoxelCoords.y == Bin.WIDTH) {
-            newLocalVoxelCoords.y = 0;
-            newBinCoords.y++;
-        }
-
-        if(newLocalVoxelCoords.z == -1) {
-            newLocalVoxelCoords.z = Bin.WIDTH - 1;
-            newBinCoords.z--;
-        }
-        else if(newLocalVoxelCoords.z == Bin.WIDTH) {
-            newLocalVoxelCoords.z = 0;
-            newBinCoords.z++;
-        }
-
-        if(!AreCoordsWithinDimensions(newBinCoords, binGridDimensions)) {
-            voxelAddress = new VoxelAddress(-1, -1);
-            return false;
-        }
-
-        int newBinIndex = CoordsToIndex(newBinCoords, binGridDimensions);
-        int newLocalVoxelIndex = CoordsToIndex(newLocalVoxelCoords, Bin.WIDTH);
-        
-        voxelAddress = new VoxelAddress(newBinIndex, newLocalVoxelIndex);
-        return true;
-    }
-
-    public static int GetBiggestVoxelClusterIndex(List<VoxelCluster> clusters) {
-        int biggestClusterIndex = -1;
-        int biggestClusterSize = int.MinValue;
-        for(int i = 0; i < clusters.Count; i++) {
-            if(clusters[i].Bins.Length > biggestClusterSize) {
-                biggestClusterSize = clusters[i].Bins.Length;
-                biggestClusterIndex = i;
-            }
-        }
-
-        Debug.Assert(biggestClusterIndex >= 0);
-        Debug.Assert(biggestClusterIndex < clusters.Count);
-        return biggestClusterIndex;
     }
 }

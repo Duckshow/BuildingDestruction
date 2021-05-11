@@ -27,108 +27,50 @@ public class UnitTester : MonoBehaviour
         Utils.RunTests();
     }
 
-    public static void Assert(string testName, Func<Vector3Int, Vector3Int> test, Parameter param, Vector3Int expectedResult) {
-        Vector3Int result = test((Vector3Int)param.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param));
-    }
-
-    public static void Assert(string testName, Func<Bin[], bool, Vector3> test, Parameter param1, Parameter param2, Vector3 expectedResult) {
-        Vector3 result = test((Bin[])param1.Value, (bool)param2.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2));
-    }
-
-    public static void Assert(string testName, Func<byte, int, bool> test, Parameter param1, Parameter param2, bool expectedResult) {
-        bool result = test((byte)param1.Value, (int)param2.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2));
-    }
-
-    public static void Assert(string testName, Func<int, Direction, byte, byte, byte, byte, bool> test, Parameter param1, Parameter param2, Parameter param3, Parameter param4, Parameter param5, Parameter param6, bool expectedResult) {
-        bool result = test((int)param1.Value, (Direction)param2.Value, (byte)param3.Value, (byte)param4.Value, (byte)param5.Value, (byte)param6.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2, param3, param4, param5, param6));
-    }
-
-    public static void Assert(string testName, Func<Direction, byte, byte, byte, byte> test, Parameter param1, Parameter param2, Parameter param3, Parameter param4, byte expectedResult) {
-        byte result = test((Direction)param1.Value, (byte)param2.Value, (byte)param3.Value, (byte)param4.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2, param3, param4));
-    }
-
-    public static void Assert(string testName, Func<List<VoxelCluster>, int> test, Parameter param, int expectedResult) {
-        int result = test((List<VoxelCluster>)param.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param));
-    }
-
-    public static void Assert(string testName, Func<Direction, Vector3Int> test, Parameter param, Vector3Int expectedResult) {
-        Vector3Int result = test((Direction)param.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param));
-    }
-
-    public delegate bool Test1(VoxelAddress address, Vector3Int dimensions, Direction direction, out VoxelAddress resultAddress);
-    public static void Assert(string testName, Test1 test, Parameter param1, Parameter param2, Parameter param3, bool expectedResult1, VoxelAddress expectedResult2) {
-        VoxelAddress resultAddress;
-        bool result = test((VoxelAddress)param1.Value, (Vector3Int)param2.Value, (Direction)param3.Value, out resultAddress);
-
-        Debug.Assert(result == expectedResult1, GetMessage(testName, result, expectedResult1, param1, param2, param3));
-        Debug.Assert(resultAddress == expectedResult2, GetMessage(testName, result, expectedResult2, param1, param2, param3));
-    }
-
-    public delegate void Test2(Bin binRight, Bin binLeft, Bin binUp, Bin binDown, Bin binFore, Bin binBack, out byte resultsRightLeft, out byte resultsUpDown, out byte resultsForeBack);
-    public static void Assert(string testName, Test2 test, Parameter param1, Parameter param2, Parameter param3, Parameter param4, Parameter param5, Parameter param6, byte expectedResultRightLeft, byte expectedResultUpDown, byte expectedResultForeBack) {
-        byte resultsRightLeft;
-        byte resultsUpDown;
-        byte resultsForeBack;
-        test((Bin)param1.Value, (Bin)param2.Value, (Bin)param3.Value, (Bin)param4.Value, (Bin)param5.Value, (Bin)param6.Value, out resultsRightLeft, out resultsUpDown, out resultsForeBack);
-
-        Debug.Assert(resultsRightLeft   == expectedResultRightLeft, GetMessage(testName, resultsRightLeft,  expectedResultRightLeft,    param1, param2, param3, param4, param5, param6));
-        Debug.Assert(resultsUpDown      == expectedResultUpDown,    GetMessage(testName, resultsUpDown,     expectedResultUpDown,       param1, param2, param3, param4, param5, param6));
-        Debug.Assert(resultsForeBack    == expectedResultForeBack,  GetMessage(testName, resultsForeBack,   expectedResultForeBack,     param1, param2, param3, param4, param5, param6));
-    }
-
-    public static void Assert(string testName, Func<Vector3Int, Vector3Int, bool> test, Parameter param1, Parameter param2, bool expectedResult) {
-        bool result = test((Vector3Int)param1.Value, (Vector3Int)param2.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2));
-    }
-
-    public static void Assert(string testName, Func<Vector3Int, Vector3Int, int> test, Parameter param1, Parameter param2, int expectedResult) {
-        int result = test((Vector3Int)param1.Value, (Vector3Int)param2.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2));
-    }
-
-    public static void Assert(string testName, Func<int, Vector3Int, Vector3Int> test, Parameter param1, Parameter param2, Vector3Int expectedResult) {
-        Vector3Int result = test((int)param1.Value, (Vector3Int)param2.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2));
-    }
-
-    public static void Assert(string testName, Func<int, Vector3Int, VoxelAddress> test, Parameter param1, Parameter param2, VoxelAddress expectedResult) {
-        VoxelAddress result = test((int)param1.Value, (Vector3Int)param2.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2));
-    }
-
-    public static void Assert(string testName, Func<VoxelAddress, Vector3Int, int> test, Parameter param1, Parameter param2, int expectedResult) {
-        int result = test((VoxelAddress)param1.Value, (Vector3Int)param2.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2));
-    }
-
-    public static void Assert(string testName, Func<VoxelAddress, Vector3Int, Vector3Int> test, Parameter param1, Parameter param2, Vector3Int expectedResult) {
-        Vector3Int result = test((VoxelAddress)param1.Value, (Vector3Int)param2.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2));
-    }
-
-    public static void Assert(string testName, Func<Vector3Int, Vector3Int, VoxelAddress> test, Parameter param1, Parameter param2, VoxelAddress expectedResult) {
-        VoxelAddress result = test((Vector3Int)param1.Value, (Vector3Int)param2.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2));
-    }
-
-    public static void Assert(string testName, Func<Vector3Int, Bin[], Vector3Int, bool> test, Parameter param1, Parameter param2, Parameter param3, bool expectedResult) {
-        bool result = test((Vector3Int)param1.Value, (Bin[])param2.Value, (Vector3Int)param3.Value);
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, param1, param2, param3));
+    [EasyButtons.Button]
+    public void TestVoxelClusterHandler() {
+        VoxelClusterHandler.RunTests();
     }
 
     public static void Assert(string testName, bool result, bool expectedResult, params Parameter[] parameters) {
         Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, parameters));
     }
 
-    public static void Assert(string testName, VoxelAddress result, VoxelAddress expectedResult, params Parameter[] parameters) {
-        Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, parameters));
+    public static void Assert<T, U>(string testName, Func<T, U> test, Parameter param, U expectedResult) where U : IEquatable<U> {
+        U result = test((T)param.Value);
+        Debug.Assert(result.Equals(expectedResult), GetMessage(testName, result, expectedResult, param));
+    }
+
+    public static void Assert<T, U, V>(string testName, Func<T, U, V> test, Parameter param1, Parameter param2, V expectedResult) where V : IEquatable<V> {
+        V result = test((T)param1.Value, (U)param2.Value);
+        Debug.Assert(result.Equals(expectedResult), GetMessage(testName, result, expectedResult, param1, param2));
+    }
+
+    public static void Assert<T, U, V, X>(string testName, Func<T, U, V, X> test, Parameter param1, Parameter param2, Parameter param3, X expectedResult) where X : IEquatable<X> {
+        X result = test((T)param1.Value, (U)param2.Value, (V)param3.Value);
+        Debug.Assert(result.Equals(expectedResult), GetMessage(testName, result, expectedResult, param1, param2, param3));
+    }
+
+    public static void Assert<T, U, V, X, Y>(string testName, Func<T, U, V, X, Y> test, Parameter param1, Parameter param2, Parameter param3, Parameter param4, Y expectedResult) where Y : IEquatable<Y> {
+        Y result = test((T)param1.Value, (U)param2.Value, (V)param3.Value, (X)param4.Value);
+        Debug.Assert(result.Equals(expectedResult), GetMessage(testName, result, expectedResult, param1, param2, param3, param4));
+    }
+
+    public static void Assert<T, U, V, X, Y, Z, A>(string testName, Func<T, U, V, X, Y, Z, A> test, Parameter param1, Parameter param2, Parameter param3, Parameter param4, Parameter param5, Parameter param6, A expectedResult) where A : IEquatable<A> {
+        A result = test((T)param1.Value, (U)param2.Value, (V)param3.Value, (X)param4.Value, (Y)param5.Value, (Z)param6.Value);
+        Debug.Assert(result.Equals(expectedResult), GetMessage(testName, result, expectedResult, param1, param2, param3, param4, param5, param6));
+    }
+
+    public delegate void TestDelegate<T, U>(T right, T left, T up, T down, T fore, T back, out U resultsRightLeft, out U resultsUpDown, out U resultsForeBack);
+    public static void Assert<T, U>(string testName, TestDelegate<T, U> test, Parameter param1, Parameter param2, Parameter param3, Parameter param4, Parameter param5, Parameter param6, U expectedResultRightLeft, U expectedResultUpDown, U expectedResultForeBack) where U : IEquatable<U> {
+        U resultsRightLeft;
+        U resultsUpDown;
+        U resultsForeBack;
+        test((T)param1.Value, (T)param2.Value, (T)param3.Value, (T)param4.Value, (T)param5.Value, (T)param6.Value, out resultsRightLeft, out resultsUpDown, out resultsForeBack);
+
+        Debug.Assert(resultsRightLeft.Equals(expectedResultRightLeft),  GetMessage(testName, resultsRightLeft,  expectedResultRightLeft,    param1, param2, param3, param4, param5, param6));
+        Debug.Assert(resultsUpDown.Equals(expectedResultUpDown),        GetMessage(testName, resultsUpDown,     expectedResultUpDown,       param1, param2, param3, param4, param5, param6));
+        Debug.Assert(resultsForeBack.Equals(expectedResultForeBack),    GetMessage(testName, resultsForeBack,   expectedResultForeBack,     param1, param2, param3, param4, param5, param6));
     }
 
     public static string GetMessage(string testName, object result, object expectedResult, params Parameter[] parameters) {
@@ -144,6 +86,19 @@ public class UnitTester : MonoBehaviour
         message += "============================";
 
         return message;
+    }
+
+    public static Bin[] GetBinsForTesting(Vector3Int dimensions) {
+        int length = dimensions.x * dimensions.y * dimensions.z;
+
+        Bin[] bins = new Bin[length];
+
+        for(int binIndex = 0; binIndex < length; binIndex++) {
+            bins[binIndex] = new Bin(binIndex, dimensions);
+            bins[binIndex].SetAllVoxelExists(true);
+        }
+
+        return bins;
     }
 
     public struct Parameter {

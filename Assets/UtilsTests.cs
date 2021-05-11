@@ -1,12 +1,16 @@
+using UnityEngine;
+
 public static partial class Utils
 {
     public static void RunTests() {
         TestGetAndSetValueFromByte();
+        TestGetDirectionVector();
+        Debug.Log("Tests done.");
     }
 
     private static void TestGetAndSetValueFromByte() {
         static void RunTest(byte b, int index, bool expectedResult) {
-            UnitTester.Assert(
+            UnitTester.Assert<byte, int, bool>(
                "GetValueFromByte",
                GetValueFromByte,
                new UnitTester.Parameter("Byte", b),
@@ -58,6 +62,24 @@ public static partial class Utils
         RunTest(b, 5, false);
         RunTest(b, 6, false);
         RunTest(b, 7, false);
+    }
 
+    private static void TestGetDirectionVector() {
+        static void RunTest(Direction dir, Vector3Int expectedResult) {
+            UnitTester.Assert<Direction, Vector3Int>(
+                "GetDirectionVector()",
+                GetDirectionVector,
+                new UnitTester.Parameter("Direction", dir),
+                expectedResult
+            );
+        }
+
+        RunTest(Direction.None, Vector3Int.zero);
+        RunTest(Direction.Right, Vector3Int.right);
+        RunTest(Direction.Left, Vector3Int.left);
+        RunTest(Direction.Up, Vector3Int.up);
+        RunTest(Direction.Down, Vector3Int.down);
+        RunTest(Direction.Fore, Vector3Int.forward);
+        RunTest(Direction.Back, Vector3Int.back);
     }
 }
