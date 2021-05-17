@@ -2,7 +2,7 @@ using UnityEngine;
 using System;
 
 public readonly partial struct Bin {
-    public const int WIDTH = 2; //! WARNING: WIDTH is hardcoded in many places, changing this will require a lot of work!
+    public const int WIDTH = 2; //! WARNING: very, very hardcoded - if you really want less granularity, consider just adding other bins on top instead!
     public const int SIZE = 8; // must be WIDTH ^ 3
 
     private const byte VOXELS_PER_FACE = WIDTH * WIDTH;
@@ -17,6 +17,15 @@ public readonly partial struct Bin {
         new Vector3Int(0, 1, 1),
         new Vector3Int(1, 1, 1)
     };
+
+    private const int LOCAL_INDEX_LOOKUP_0_0_0 = 0;
+    private const int LOCAL_INDEX_LOOKUP_1_0_0 = 1;
+    private const int LOCAL_INDEX_LOOKUP_0_1_0 = 2;
+    private const int LOCAL_INDEX_LOOKUP_1_1_0 = 3;
+    private const int LOCAL_INDEX_LOOKUP_0_0_1 = 4;
+    private const int LOCAL_INDEX_LOOKUP_1_0_1 = 5;
+    private const int LOCAL_INDEX_LOOKUP_0_1_1 = 6;
+    private const int LOCAL_INDEX_LOOKUP_1_1_1 = 7;
 
     public readonly int Index;
     public readonly Vector3Int Coords;
@@ -122,13 +131,16 @@ public readonly partial struct Bin {
         return (~voxels & targetVoxels1 & targetVoxels2) > 0;
     }
 
-    public bool IsConnectedToNeighbor(Bin neighbor, Direction direction) {
-        Direction oppositeDirection = Utils.GetOppositeDirection(direction);
+    public bool IsConnectedToNeighbor(Direction direction) {
+        byte cachedNeighbors = GetCachedVoxelNeighbors(direction);
 
-        byte cachedNeighbors0 = GetCachedVoxelNeighbors(direction);
-        byte cachedNeighbors1 = neighbor.GetCachedVoxelNeighbors(oppositeDirection);
+        byte voxelsOnFace = 0;
+        for(int i = 0; i < VOXELS_PER_FACE; i++) {
+            int localVoxelIndex = FaceVoxelIndexToLocalVoxelIndex(i, direction);
+            Utils.SetValueInByte(ref voxelsOnFace, i, Utils.GetValueFromByte(voxels, localVoxelIndex));
+        }
 
-        return (cachedNeighbors0 & cachedNeighbors1) > 0;
+        return (cachedNeighbors & voxelsOnFace) > 0;
     }
 
     public bool IsWholeBinFilled() {
@@ -167,8 +179,44 @@ public readonly partial struct Bin {
         return VoxelGrid.IndexToCoords(binIndex, binGridDimensions) * WIDTH + GetVoxelLocalCoords(localVoxelIndex);
     }
 
+    public static int GetVoxelGlobalIndex(int binIndex, int localVoxelIndex, Vector3Int binGridDimensions) {
+        Vector3Int globalCoords = GetVoxelGlobalCoords(binIndex, localVoxelIndex, binGridDimensions);
+        Vector3Int voxelGridDimensions = VoxelGrid.CalculateVoxelGridDimensions(binGridDimensions);
+
+        return VoxelGrid.CoordsToIndex(globalCoords, voxelGridDimensions);
+    }
+
     public static Vector3Int GetVoxelLocalCoords(int localVoxelIndex) {
         return LOCAL_COORDS_LOOKUP[localVoxelIndex];
+    }
+
+    public static int GetVoxelLocalIndex(int localX, int localY, int localZ) {
+        if(localX == 0 && localY == 0 && localZ == 0) {
+            return LOCAL_INDEX_LOOKUP_0_0_0;
+        }
+        if(localX == 1 && localY == 0 && localZ == 0) {
+            return LOCAL_INDEX_LOOKUP_1_0_0;
+        }
+        if(localX == 0 && localY == 1 && localZ == 0) {
+            return LOCAL_INDEX_LOOKUP_0_1_0;
+        }
+        if(localX == 1 && localY == 1 && localZ == 0) {
+            return LOCAL_INDEX_LOOKUP_1_1_0;
+        }
+        if(localX == 0 && localY == 0 && localZ == 1) {
+            return LOCAL_INDEX_LOOKUP_0_0_1;
+        }
+        if(localX == 1 && localY == 0 && localZ == 1) {
+            return LOCAL_INDEX_LOOKUP_1_0_1;
+        }
+        if(localX == 0 && localY == 1 && localZ == 1) {
+            return LOCAL_INDEX_LOOKUP_0_1_1;
+        }
+        if(localX == 1 && localY == 1 && localZ == 1) {
+            return LOCAL_INDEX_LOOKUP_1_1_1;
+        }
+
+        return -1;
     }
 
     public static void SetBinVoxelExists(Bin[] bins, int binIndex, int localVoxelIndex, bool exists) {
