@@ -7,15 +7,7 @@ public enum Direction { //! WARNING: changing the integers could seriously mess 
     Up = 2,
     Down = 3,
     Fore = 4,
-    Back = 5,
-    UpRight,
-    UpLeft,
-    UpFore,
-    UpBack,
-    DownRight,
-    DownLeft,
-    DownFore,
-    DownBack
+    Back = 5
 }
 
 public static partial class Utils
@@ -37,6 +29,23 @@ public static partial class Utils
         }
     }
 
+    public static bool GetValueFromULong(ulong u, int index) {
+        ulong shiftedVariable = u >> index;
+        
+        return (shiftedVariable & 1) == 1;
+    }
+
+    public static void SetValueInULong(ref ulong u, int index, bool value) {
+        ulong shiftedValue = (ulong)(1 << index);
+
+        if(value) {
+            u |= shiftedValue;
+        }
+        else {
+            u &= ~shiftedValue;
+        }
+    }
+
     public static Vector3Int GetDirectionVector(Direction dir) {
         switch(dir) {
             case Direction.None:        return Vector3Int.zero;
@@ -46,14 +55,6 @@ public static partial class Utils
             case Direction.Down:        return Vector3Int.down;
             case Direction.Fore:        return Vector3Int.forward;
             case Direction.Back:        return Vector3Int.back;
-            case Direction.UpRight:     return Vector3Int.up + Vector3Int.right;
-            case Direction.UpLeft:      return Vector3Int.up + Vector3Int.left;
-            case Direction.UpFore:      return Vector3Int.up + Vector3Int.forward;
-            case Direction.UpBack:      return Vector3Int.up + Vector3Int.back;
-            case Direction.DownRight:   return Vector3Int.down + Vector3Int.right;
-            case Direction.DownLeft:    return Vector3Int.down + Vector3Int.left;
-            case Direction.DownFore:    return Vector3Int.down + Vector3Int.forward;
-            case Direction.DownBack:    return Vector3Int.down + Vector3Int.back;
         }
 
         return Vector3Int.zero;

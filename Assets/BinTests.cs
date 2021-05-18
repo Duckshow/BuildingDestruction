@@ -8,6 +8,7 @@ public readonly partial struct Bin {
         TestGetVoxelHasNeighbor();
         TestGetCachedVoxelNeighbors();
         TestHasOpenPathBetweenFaces();
+        TestGetVisualID();
         Debug.Log("Tests done.");
     }
 
@@ -376,5 +377,57 @@ public readonly partial struct Bin {
                 }
             }
         }
+    }
+
+    private static void TestGetVisualID() {
+        Bin GetNewBin(bool exists, bool hasNeighborRight, bool hasNeighborLeft, bool hasNeighborUp, bool hasNeighborDown, bool hasNeighborFore, bool hasNeighborBack) {
+            Bin bin = new Bin(0, Vector3Int.one);
+            bin = SetBinAllVoxelsExists(bin, exists);
+
+            Bin binRight = new Bin(0, Vector3Int.one);
+            Bin binLeft  = new Bin(0, Vector3Int.one);
+            Bin binUp    = new Bin(0, Vector3Int.one);
+            Bin binDown  = new Bin(0, Vector3Int.one);
+            Bin binFore  = new Bin(0, Vector3Int.one);
+            Bin binBack  = new Bin(0, Vector3Int.one);
+
+            binRight = SetBinAllVoxelsExists(binRight, hasNeighborRight);
+            binLeft  = SetBinAllVoxelsExists(binLeft, hasNeighborLeft);
+            binUp    = SetBinAllVoxelsExists(binUp, hasNeighborUp);
+            binDown  = SetBinAllVoxelsExists(binDown, hasNeighborDown);
+            binFore  = SetBinAllVoxelsExists(binFore, hasNeighborFore);
+            binBack  = SetBinAllVoxelsExists(binBack, hasNeighborBack);
+
+            return Bin.RefreshConnectivityInBin(bin, binRight, binLeft, binUp, binDown, binFore, binBack);
+        }
+
+        Bin bin;
+
+        bin = GetNewBin(exists: true, hasNeighborRight: false, hasNeighborLeft: false, hasNeighborUp: false, hasNeighborDown: false, hasNeighborFore: false, hasNeighborBack: false);
+        Debug.LogFormat("GetID Results, No neighbors: " + Convert.ToString((long)GetVisualID(bin), 2));
+
+        bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+        Debug.LogFormat("GetID Results, All neighbors: " + Convert.ToString((long)GetVisualID(bin), 2));
+
+        bin = GetNewBin(exists: true, hasNeighborRight: false, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+        Debug.LogFormat("GetID Results: No neighbors right: " + Convert.ToString((long)GetVisualID(bin), 2));
+
+        bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: false, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+        Debug.LogFormat("GetID Results, No neighbors left: " + Convert.ToString((long)GetVisualID(bin), 2));
+
+        bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: false, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+        Debug.LogFormat("GetID Results, No neighbors up: " + Convert.ToString((long)GetVisualID(bin), 2));
+
+        bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: false, hasNeighborFore: true, hasNeighborBack: true);
+        Debug.LogFormat("GetID Results, No neighbors down: " + Convert.ToString((long)GetVisualID(bin), 2));
+
+        bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: false, hasNeighborBack: true);
+        Debug.LogFormat("GetID Results, No neighbors fore: " + Convert.ToString((long)GetVisualID(bin), 2));
+
+        bin = GetNewBin(exists: true, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: false);
+        Debug.LogFormat("GetID Results, No neighbors back: " + Convert.ToString((long)GetVisualID(bin), 2));
+
+        bin = GetNewBin(exists: false, hasNeighborRight: true, hasNeighborLeft: true, hasNeighborUp: true, hasNeighborDown: true, hasNeighborFore: true, hasNeighborBack: true);
+        Debug.LogFormat("GetID Results, No filled: " + Convert.ToString((long)GetVisualID(bin), 2));
     }
 }

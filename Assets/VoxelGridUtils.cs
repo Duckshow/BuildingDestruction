@@ -28,7 +28,7 @@ public partial class VoxelGrid
         return bin.GetVoxelExists(localVoxelIndex);
     }
 
-    private static bool GetBinAndVoxelIndex(Vector3Int voxelCoords, Bin[] bins, Vector3Int binGridDimensions, out int binIndex, out int localVoxelIndex) {
+    public static bool GetBinAndVoxelIndex(Vector3Int voxelCoords, Bin[] bins, Vector3Int binGridDimensions, out int binIndex, out int localVoxelIndex) {
         Vector3Int binCoords = voxelCoords / Bin.WIDTH;
         binIndex = CoordsToIndex(binCoords, binGridDimensions);
 

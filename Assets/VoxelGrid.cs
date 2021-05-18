@@ -160,6 +160,7 @@ public partial class VoxelGrid : MonoBehaviour
     }
 
     public void SetVoxelExists(Vector3Int voxelCoords, bool exists) {
+
         int binIndex, localVoxelIndex;
         if(!GetBinAndVoxelIndex(voxelCoords, bins, binGridDimensions, out binIndex, out localVoxelIndex)) {
             return;
@@ -167,24 +168,28 @@ public partial class VoxelGrid : MonoBehaviour
 
         Bin.SetBinVoxelExists(bins, binIndex, localVoxelIndex, exists);
         
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.None,         bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Right,        bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Left,         bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Up,           bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Down,         bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Fore,         bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.Back,         bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpRight,      bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpLeft,       bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpFore,       bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.UpBack,       bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownRight,    bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownLeft,     bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownFore,     bins, binGridDimensions, dirtyBins);
-        TryGetOrCreateVoxelAndSetDirty(voxelCoords, Direction.DownBack,     bins, binGridDimensions, dirtyBins);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.None);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Right);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Left);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Up);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Down);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Fore);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Back);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Up,   Direction.Right);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Up,   Direction.Left);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Up,   Direction.Fore);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Up,   Direction.Back);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Down, Direction.Right);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Down, Direction.Left);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Down, Direction.Fore);
+        TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Down, Direction.Back);
 
-        static void TryGetOrCreateVoxelAndSetDirty(Vector3Int voxelCoords, Direction direction, Bin[] bins, Vector3Int binGridDimensions, Queue<int> dirtyBins) {
+        static void TryGetOrCreateVoxelAndSetDirty(Vector3Int voxelCoords, Bin[] bins, Vector3Int binGridDimensions, Queue<int> dirtyBins, Direction direction, Direction additionalDirection = Direction.None) {
             voxelCoords += Utils.GetDirectionVector(direction);
+            
+            if(additionalDirection != Direction.None) {
+                voxelCoords += Utils.GetDirectionVector(additionalDirection);
+            }
 
             int binIndex, localVoxelIndex;
             if(!GetBinAndVoxelIndex(voxelCoords, bins, binGridDimensions, out binIndex, out localVoxelIndex)) {

@@ -1,128 +1,17 @@
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Jobs;
-using Unity.Collections;
 
 public static partial class VoxelClusterHandler {
-    //public struct FindClusterJob : IJobParallelFor {
-    //    [ReadOnly] public NativeArray<int> startingPoints;
-    //    [ReadOnly] public NativeArray<bool> visitedBins;
 
-    //    public NativeArray<float> result;
-
-    //    public void Execute(int workerIndex) {
-    //        int startingPoint = startingPoints[workerIndex];
-
-    //        Queue<MoveOrder> pathsNotTaken = new Queue<MoveOrder>();
-    //        pathsNotTaken.Enqueue(new MoveOrder(startingPoint, Direction.None));
-
-    //        while(pathsNotTaken.Count > 0) {
-    //            MoveOrder? nextOrderOnCurrentPath = pathsNotTaken.Dequeue();
-
-    //            while(nextOrderOnCurrentPath != null) {
-    //                Bin currentBin = bins[nextOrderOnCurrentPath.Value.TargetIndex];
-    //                Direction directionToPreviousBin = nextOrderOnCurrentPath.Value.DirectionToOrigin;
-    //                nextOrderOnCurrentPath = null;
-
-    //                if(visitedBins[currentBin.Index]) {
-    //                    break;
-    //                }
-    //                visitedBins[currentBin.Index] = true;
-
-    //                if(!currentBin.IsWalledIn()) {
-    //                    foundBins.Enqueue(currentBin.Index);
-    //                }
-
-    //                Vector3Int binCoords = VoxelGrid.IndexToCoords(currentBin.Index, binGridDimensions);
-    //                minCoord.x = Mathf.Min(minCoord.x, binCoords.x);
-    //                minCoord.y = Mathf.Min(minCoord.y, binCoords.y);
-    //                minCoord.z = Mathf.Min(minCoord.z, binCoords.z);
-    //                maxCoord.x = Mathf.Max(maxCoord.x, binCoords.x);
-    //                maxCoord.y = Mathf.Max(maxCoord.y, binCoords.y);
-    //                maxCoord.z = Mathf.Max(maxCoord.z, binCoords.z);
-
-    //                TryFollowPath(Direction.Right);
-    //                TryFollowPath(Direction.Left);
-    //                TryFollowPath(Direction.Fore);
-    //                TryFollowPath(Direction.Back);
-
-    //                MoveOrder newMoveOrder;
-    //                if(TryGetNewMoveOrder(currentBin, Direction.Up, out newMoveOrder)) {
-    //                    startingPoints.Enqueue(newMoveOrder.TargetIndex);
-    //                }
-    //                if(TryGetNewMoveOrder(currentBin, Direction.Down, out newMoveOrder)) {
-    //                    startingPoints.Enqueue(newMoveOrder.TargetIndex);
-    //                }
-
-    //                void TryFollowPath(Direction direction) {
-    //                    MoveOrder newMoveOrder;
-
-    //                    if(TryGetNewMoveOrder(currentBin, direction, out newMoveOrder)) {
-    //                        if(nextOrderOnCurrentPath == null) {
-    //                            nextOrderOnCurrentPath = newMoveOrder;
-    //                        }
-    //                        else {
-    //                            pathsNotTaken.Enqueue(newMoveOrder);
-    //                        }
-    //                    }
-    //                }
-
-    //                bool TryGetNewMoveOrder(Bin originBin, Direction direction, out MoveOrder newMoveOrder) {
-    //                    newMoveOrder = new MoveOrder();
-
-    //                    if(direction == directionToPreviousBin) {
-    //                        return false;
-    //                    }
-
-    //                    Vector3Int neighborCoords = originBin.Coords + Utils.GetDirectionVector(direction);
-    //                    if(!VoxelGrid.AreCoordsWithinDimensions(neighborCoords, binGridDimensions)) {
-    //                        return false;
-    //                    }
-
-    //                    int neighborIndex = VoxelGrid.CoordsToIndex(neighborCoords, binGridDimensions);
-    //                    if(visitedBins[neighborIndex]) {
-    //                        return false;
-    //                    }
-
-    //                    Bin neighborBin = bins[neighborIndex];
-    //                    if(neighborBin == null) {
-    //                        return false;
-    //                    }
-
-    //                    if(neighborBin.IsWholeBinEmpty()) {
-    //                        return false;
-    //                    }
-
-    //                    if(originBin.IsWalledIn() && neighborBin.IsWalledIn()) {
-    //                        return false;
-    //                    }
-
-    //                    if(!originBin.IsConnectedToNeighbor(neighborBin, direction)) {
-    //                        return false;
-    //                    }
-
-    //                    newMoveOrder = new MoveOrder(neighborIndex, direction);
-    //                    return true;
-    //                }
-    //            }
-    //        }
-    //    }
-    //}
-
-    private struct MoveOrder {
-        public int TargetIndex;
-        public Direction DirectionToOrigin;
-
-        public MoveOrder(int targetIndex, Direction direction) {
-            TargetIndex = targetIndex;
-            DirectionToOrigin = Utils.GetOppositeDirection(direction);
-        }
-    }
+    private static List<VoxelCluster> clusters = new List<VoxelCluster>();
+    private static Queue<int> binsToVisit = new Queue<int>();
+    private static Queue<int> foundBins = new Queue<int>();
+    private static Queue<MoveOrder> moveOrders = new Queue<MoveOrder>();
 
     public static void FindVoxelClustersAndSplit(VoxelGrid voxelGrid, Queue<int> newlyCleanedBins) {
-        List<VoxelCluster> clusters = new List<VoxelCluster>();
         bool[] visitedBins = new bool[voxelGrid.GetBinCount()];
 
+        clusters.Clear();
         while(newlyCleanedBins.Count > 0) {
             int binIndex = newlyCleanedBins.Dequeue();
 
@@ -140,105 +29,56 @@ public static partial class VoxelClusterHandler {
         Vector3Int minCoord = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
         Vector3Int maxCoord = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
 
-        Queue<int> foundBins = new Queue<int>();
-        Queue<int> startingPoints = new Queue<int>();
-        startingPoints.Enqueue(startBinIndex);
+        foundBins.Clear();
+        binsToVisit.Clear();
+        binsToVisit.Enqueue(startBinIndex);
 
-        while(startingPoints.Count > 0) {
-            int startingPoint = startingPoints.Dequeue();
+        while(binsToVisit.Count > 0) {
+            int binIndex = binsToVisit.Dequeue();
+            if(visitedBins[binIndex]) {
+                continue;
+            }
 
-            Queue<MoveOrder> pathsNotTaken = new Queue<MoveOrder>();
-            pathsNotTaken.Enqueue(new MoveOrder(startingPoint, Direction.None));
+            visitedBins[binIndex] = true;
+            foundBins.Enqueue(binIndex);
 
-            while(pathsNotTaken.Count > 0) {
-                MoveOrder? nextOrderOnCurrentPath = pathsNotTaken.Dequeue();
+            Vector3Int binCoords = VoxelGrid.IndexToCoords(binIndex, binGridDimensions);
+            minCoord.x = Mathf.Min(minCoord.x, binCoords.x);
+            minCoord.y = Mathf.Min(minCoord.y, binCoords.y);
+            minCoord.z = Mathf.Min(minCoord.z, binCoords.z);
+            maxCoord.x = Mathf.Max(maxCoord.x, binCoords.x);
+            maxCoord.y = Mathf.Max(maxCoord.y, binCoords.y);
+            maxCoord.z = Mathf.Max(maxCoord.z, binCoords.z);
 
-                while(nextOrderOnCurrentPath != null) {
-                    Bin currentBin = bins[nextOrderOnCurrentPath.Value.TargetIndex];
-                    Direction directionToPreviousBin = nextOrderOnCurrentPath.Value.DirectionToOrigin;
-                    nextOrderOnCurrentPath = null;
+            TryAddNeighborToVisit(binIndex, bins, binGridDimensions, Direction.Right, binsToVisit);
+            TryAddNeighborToVisit(binIndex, bins, binGridDimensions, Direction.Left,  binsToVisit);
+            TryAddNeighborToVisit(binIndex, bins, binGridDimensions, Direction.Up,    binsToVisit);
+            TryAddNeighborToVisit(binIndex, bins, binGridDimensions, Direction.Down,  binsToVisit);
+            TryAddNeighborToVisit(binIndex, bins, binGridDimensions, Direction.Fore,  binsToVisit);
+            TryAddNeighborToVisit(binIndex, bins, binGridDimensions, Direction.Back,  binsToVisit);
 
-                    if(visitedBins[currentBin.Index]) {
-                        break;
-                    }
-                    visitedBins[currentBin.Index] = true;
+            static void TryAddNeighborToVisit(int centerBinIndex, Bin[] bins, Vector3Int binGridDimension, Direction direction, Queue<int> binsToVisit) {
+                Bin centerBin = bins[centerBinIndex];
 
-                    if(!currentBin.IsWalledIn()) {
-                        foundBins.Enqueue(currentBin.Index);
-                    }
-
-                    Vector3Int binCoords = VoxelGrid.IndexToCoords(currentBin.Index, binGridDimensions);
-                    minCoord.x = Mathf.Min(minCoord.x, binCoords.x);
-                    minCoord.y = Mathf.Min(minCoord.y, binCoords.y);
-                    minCoord.z = Mathf.Min(minCoord.z, binCoords.z);
-                    maxCoord.x = Mathf.Max(maxCoord.x, binCoords.x);
-                    maxCoord.y = Mathf.Max(maxCoord.y, binCoords.y);
-                    maxCoord.z = Mathf.Max(maxCoord.z, binCoords.z);
-
-                    TryFollowPath(Direction.Right);
-                    TryFollowPath(Direction.Left);
-                    TryFollowPath(Direction.Fore);
-                    TryFollowPath(Direction.Back);
-
-                    MoveOrder newMoveOrder;
-                    if(TryGetNewMoveOrder(currentBin, Direction.Up, out newMoveOrder)) {
-                        startingPoints.Enqueue(newMoveOrder.TargetIndex);
-                    }
-                    if(TryGetNewMoveOrder(currentBin, Direction.Down, out newMoveOrder)) {
-                        startingPoints.Enqueue(newMoveOrder.TargetIndex);
-                    }
-
-                    void TryFollowPath(Direction direction) {
-                        MoveOrder newMoveOrder;
-
-                        if(TryGetNewMoveOrder(currentBin, direction, out newMoveOrder)) {
-                            if(nextOrderOnCurrentPath == null) {
-                                nextOrderOnCurrentPath = newMoveOrder;
-                            }
-                            else {
-                                pathsNotTaken.Enqueue(newMoveOrder);
-                            }
-                        }
-                    }
-
-                    bool TryGetNewMoveOrder(Bin originBin, Direction direction, out MoveOrder newMoveOrder) {
-                        newMoveOrder = new MoveOrder();
-
-                        if(direction == directionToPreviousBin) {
-                            return false;
-                        }
-
-                        Vector3Int neighborCoords = originBin.Coords + Utils.GetDirectionVector(direction);
-                        if(!VoxelGrid.AreCoordsWithinDimensions(neighborCoords, binGridDimensions)) {
-                            return false;
-                        }
-
-                        int neighborIndex = VoxelGrid.CoordsToIndex(neighborCoords, binGridDimensions);
-                        if(visitedBins[neighborIndex]) {
-                            return false;
-                        }
-
-                        Bin neighborBin = bins[neighborIndex];
-                        if(neighborBin.IsWholeBinEmpty()) {
-                            return false;
-                        }
-
-                        if(neighborBin.IsWholeBinEmpty()) {
-                            return false;
-                        }
-
-                        if(originBin.IsWalledIn() && neighborBin.IsWalledIn()) {
-                            return false;
-                        }
-
-                        if(!originBin.IsConnectedToNeighbor(neighborBin, direction)) {
-                            return false;
-                        }
-
-                        newMoveOrder = new MoveOrder(neighborIndex, direction);
-                        return true;
-                    }
+                if(!centerBin.IsConnectedToNeighbor(direction)) {
+                    return;
                 }
+
+                int neighborIndex = VoxelGrid.CoordsToIndex(centerBin.Coords + Utils.GetDirectionVector(direction), binGridDimension);
+                if(neighborIndex == -1) {
+                    return;
+                }
+
+                Bin neighborBin = bins[neighborIndex];
+                if(neighborBin.IsWholeBinEmpty()) {
+                    return;
+                }
+
+                if(centerBin.IsWalledIn() && neighborBin.IsWalledIn()) {
+                    return;
+                }
+
+                binsToVisit.Enqueue(neighborIndex);
             }
         }
 
@@ -281,11 +121,11 @@ public static partial class VoxelClusterHandler {
         }
 
         static void FloodFillExteriorBins(Vector3Int startBinCoords, Bin[] bins, Vector3Int binGridDimensions, bool[] visitedBins) {
-            Queue<MoveOrder> binsToVisit = new Queue<MoveOrder>();
-            binsToVisit.Enqueue(new MoveOrder(VoxelGrid.CoordsToIndex(startBinCoords, binGridDimensions), Direction.None));
+            moveOrders.Clear();
+            moveOrders.Enqueue(new MoveOrder(VoxelGrid.CoordsToIndex(startBinCoords, binGridDimensions), Direction.None));
 
-            while(binsToVisit.Count > 0) {
-                MoveOrder moveOrder = binsToVisit.Dequeue();
+            while(moveOrders.Count > 0) {
+                MoveOrder moveOrder = moveOrders.Dequeue();
                 if(moveOrder.TargetIndex == -1) {
                     continue;
                 }
@@ -307,25 +147,30 @@ public static partial class VoxelClusterHandler {
 
                 MoveOrder newMoveOrder;
                 if(TryGetNewMoveOrder(Direction.Right, currentBin, currentBinCoords, binGridDimensions, moveOrder, out newMoveOrder)) {
-                    binsToVisit.Enqueue(newMoveOrder);
+                    moveOrders.Enqueue(newMoveOrder);
                 }
                 if(TryGetNewMoveOrder(Direction.Left, currentBin, currentBinCoords, binGridDimensions, moveOrder, out newMoveOrder)) {
-                    binsToVisit.Enqueue(newMoveOrder);
+                    moveOrders.Enqueue(newMoveOrder);
                 }
                 if(TryGetNewMoveOrder(Direction.Up, currentBin, currentBinCoords, binGridDimensions, moveOrder, out newMoveOrder)) {
-                    binsToVisit.Enqueue(newMoveOrder);
+                    moveOrders.Enqueue(newMoveOrder);
                 }
                 if(TryGetNewMoveOrder(Direction.Down, currentBin, currentBinCoords, binGridDimensions, moveOrder, out newMoveOrder)) {
-                    binsToVisit.Enqueue(newMoveOrder);
+                    moveOrders.Enqueue(newMoveOrder);
                 }
                 if(TryGetNewMoveOrder(Direction.Fore, currentBin, currentBinCoords, binGridDimensions, moveOrder, out newMoveOrder)) {
-                    binsToVisit.Enqueue(newMoveOrder);
+                    moveOrders.Enqueue(newMoveOrder);
                 }
                 if(TryGetNewMoveOrder(Direction.Back, currentBin, currentBinCoords, binGridDimensions, moveOrder, out newMoveOrder)) {
-                    binsToVisit.Enqueue(newMoveOrder);
+                    moveOrders.Enqueue(newMoveOrder);
                 }
 
                 static bool TryGetNewMoveOrder(Direction direction, Bin currentBin, Vector3Int binCoords, Vector3Int binGridDimensions, MoveOrder currentMoveOrder, out MoveOrder newMoveOrder) {
+                    if(direction == currentMoveOrder.DirectionToOrigin) {
+                        newMoveOrder = new MoveOrder();
+                        return false;
+                    }
+                    
                     if(!currentBin.IsWholeBinEmpty() && !currentBin.HasOpenPathBetweenFaces(currentMoveOrder.DirectionToOrigin, direction)) {
                         newMoveOrder = new MoveOrder();
                         return false;
@@ -416,5 +261,15 @@ public static partial class VoxelClusterHandler {
         Debug.Assert(biggestClusterIndex >= 0);
         Debug.Assert(biggestClusterIndex < clusters.Count);
         return biggestClusterIndex;
+    }
+
+    private struct MoveOrder {
+        public int TargetIndex;
+        public Direction DirectionToOrigin;
+
+        public MoveOrder(int targetIndex, Direction direction) {
+            TargetIndex = targetIndex;
+            DirectionToOrigin = Utils.GetOppositeDirection(direction);
+        }
     }
 }

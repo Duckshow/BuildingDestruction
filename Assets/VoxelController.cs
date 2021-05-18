@@ -4,6 +4,8 @@ using UnityEngine;
 [RequireComponent(typeof(VoxelGrid))]
 public class VoxelController : MonoBehaviour {
 	private VoxelGrid voxelGrid;
+	private List<Vector3Int> hitVoxels = new List<Vector3Int>();
+	private List<Vector3> hitVoxelsWorldPositions = new List<Vector3>();
 
 	private void Awake() {
 		voxelGrid = GetComponent<VoxelGrid>();
@@ -40,8 +42,9 @@ public class VoxelController : MonoBehaviour {
 
 	private void FireBeam(bool isInstant) {
 		Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-		List<Vector3Int> hitVoxels = new List<Vector3Int>();
-		List<Vector3> hitVoxelsWorldPositions = new List<Vector3>();
+
+		hitVoxels.Clear();
+		hitVoxelsWorldPositions.Clear();;
 
 		Vector3Int binGridDimensions = voxelGrid.GetBinGridDimensions();
 

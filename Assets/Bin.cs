@@ -4,6 +4,7 @@ using System;
 public readonly partial struct Bin {
     public const int WIDTH = 2; //! WARNING: very, very hardcoded - if you really want less granularity, consider just adding other bins on top instead!
     public const int SIZE = 8; // must be WIDTH ^ 3
+    public const int FACES = 6; // must be WIDTH * 3
 
     private const byte VOXELS_PER_FACE = WIDTH * WIDTH;
 
@@ -33,7 +34,7 @@ public readonly partial struct Bin {
 
     private readonly byte voxels;
     private readonly byte areVoxelsDirty;
-    private readonly byte voxelNeighborsRightLeft; // TODO: do I really need this? can't I just check connections like I do know, but just save whether or not it was successful?
+    private readonly byte voxelNeighborsRightLeft;
     private readonly byte voxelNeighborsUpDown;
     private readonly byte voxelNeighborsForeBack;
 
@@ -298,19 +299,29 @@ public readonly partial struct Bin {
         return new Bin(bin, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
     }
 
-    private static bool GetVoxelHasNeighbor(int localVoxelIndex, Direction direction, byte binVoxels, byte voxelNeighborsRightLeft, byte voxelNeighborsUpDown, byte voxelNeighborsForeBack) {
-        Vector3Int localCoords = LOCAL_COORDS_LOOKUP[localVoxelIndex];
-        Vector3Int neighborCoords = localCoords + Utils.GetDirectionVector(direction);
+    private static bool GetVoxelHasNeighbor(int localVoxelIndex, Direction direction, byte voxels, byte voxelNeighborsRightLeft, byte voxelNeighborsUpDown, byte voxelNeighborsForeBack) {
+        Vector3Int localCoords = GetVoxelLocalCoords(localVoxelIndex);
 
-        if(!VoxelGrid.AreCoordsWithinDimensions(neighborCoords.x, neighborCoords.y, neighborCoords.z, WIDTH, WIDTH, WIDTH)) {
-            byte voxelNeighbors = GetCachedVoxelNeighbors(direction, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
-            int index = LocalVoxelIndexToFaceVoxelIndex(localVoxelIndex, direction);
-
-            return ((voxelNeighbors >> index) & 1) > 0;
+        bool isNeighborInSameBin = false;
+        switch(direction) {
+            case Direction.Right:   { isNeighborInSameBin = localCoords.x == 0; break; }
+            case Direction.Left:    { isNeighborInSameBin = localCoords.x == 1; break; }
+            case Direction.Up:      { isNeighborInSameBin = localCoords.y == 0; break; }
+            case Direction.Down:    { isNeighborInSameBin = localCoords.y == 1; break; }
+            case Direction.Fore:    { isNeighborInSameBin = localCoords.z == 0; break; }
+            case Direction.Back:    { isNeighborInSameBin = localCoords.z == 1; break; }
         }
 
-        int neighborLocalVoxelIndex = VoxelGrid.CoordsToIndex(neighborCoords, WIDTH);
-        return Utils.GetValueFromByte(binVoxels, neighborLocalVoxelIndex);
+        if(isNeighborInSameBin) {
+            Vector3Int dirVec = Utils.GetDirectionVector(direction);
+            int neighborIndex = GetVoxelLocalIndex(localCoords.x + dirVec.x, localCoords.y + dirVec.y, localCoords.z + dirVec.z);
+            return Utils.GetValueFromByte(voxels, neighborIndex);
+        }
+        else {
+            int faceVoxelIndex = LocalVoxelIndexToFaceVoxelIndex(localVoxelIndex, direction);
+            byte neighbors = GetCachedVoxelNeighbors(direction, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
+            return Utils.GetValueFromByte(neighbors, faceVoxelIndex);
+        }
     }
 
     private static byte GetCachedVoxelNeighbors(Direction direction, byte voxelNeighborsRightLeft, byte voxelNeighborsUpDown, byte voxelNeighborsForeBack) {
@@ -387,7 +398,7 @@ public readonly partial struct Bin {
             }
         }
 
-        return -1;
+        throw new NotImplementedException();
     }
 
     private static int FaceVoxelIndexToLocalVoxelIndex(int faceVoxelIndex, Direction face) {
@@ -437,5 +448,13 @@ public readonly partial struct Bin {
         }
 
         return -1;
+    }
+
+    public static ulong GetVisualID(Bin bin) {
+        ulong id = bin.voxels;
+        id |= ((ulong)bin.voxelNeighborsRightLeft   << 8);
+        id |= ((ulong)bin.voxelNeighborsUpDown      << 16);
+        id |= ((ulong)bin.voxelNeighborsForeBack    << 24);
+        return id;
     }
 }
