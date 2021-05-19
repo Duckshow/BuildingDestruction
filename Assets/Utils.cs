@@ -10,6 +10,8 @@ public enum Direction { //! WARNING: changing the integers could seriously mess 
     Back = 5
 }
 
+public delegate void Callback();
+
 public static partial class Utils
 {
     public static bool GetValueFromByte(byte b, int index) {

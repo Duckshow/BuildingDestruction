@@ -4,8 +4,6 @@ using UnityEngine;
 [RequireComponent(typeof(VoxelGrid))]
 public class VoxelController : MonoBehaviour {
 	private VoxelGrid voxelGrid;
-	private List<Vector3Int> hitVoxels = new List<Vector3Int>();
-	private List<Vector3> hitVoxelsWorldPositions = new List<Vector3>();
 
 	private void Awake() {
 		voxelGrid = GetComponent<VoxelGrid>();
@@ -15,6 +13,9 @@ public class VoxelController : MonoBehaviour {
 		if(voxelGrid == null) {
 			return;
 		}
+        if(voxelGrid.State != VoxelGrid.UpdateState.UpToDate) {
+			return;
+        }
 
         if(Input.GetKeyDown(KeyCode.Space)) {
 			Vector3Int voxelGridDimensions = voxelGrid.GetVoxelGridDimensions();
@@ -26,7 +27,7 @@ public class VoxelController : MonoBehaviour {
 							continue;
                         }
 
-						voxelGrid.SetVoxelExists(new Vector3Int(x, y, z), exists: false);
+						voxelGrid.TrySetVoxelExists(new Vector3Int(x, y, z), exists: false);
 					}
 				}
 			}
@@ -41,55 +42,26 @@ public class VoxelController : MonoBehaviour {
 	}
 
 	private void FireBeam(bool isInstant) {
-		Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-
-		hitVoxels.Clear();
-		hitVoxelsWorldPositions.Clear();;
-
 		Vector3Int binGridDimensions = voxelGrid.GetBinGridDimensions();
+		Vector3Int voxelGridDimensions = VoxelGrid.CalculateVoxelGridDimensions(binGridDimensions);
 
-		Bounds b = new Bounds(Vector3.zero, Vector3.one);
-		for(int binIndex = 0; binIndex < voxelGrid.GetBinCount(); binIndex++) {
-			Bin bin = voxelGrid.GetBin(binIndex);
-            if(bin.IsWholeBinEmpty() && bin.IsExterior) {
+		Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+		Vector3Int lineStartCoords = voxelGrid.GetVoxelCoordsFromWorldPos(mouseWorldPos);
+		Vector3Int lineEndCoords = voxelGrid.GetVoxelCoordsFromWorldPos(mouseWorldPos + Camera.main.transform.forward * 100);
+
+		Vector3Int[] line = Bresenhams3D.GetLine(lineStartCoords, lineEndCoords);
+
+		for(int i = 0; i < line.Length; i++) {
+			Vector3Int lineVoxelCoords = line[i];
+            
+			if(!VoxelGrid.AreCoordsWithinDimensions(lineVoxelCoords, voxelGridDimensions)) {
 				continue;
             }
 
-            for(int localVoxelIndex = 0; localVoxelIndex < Bin.SIZE; localVoxelIndex++) {
-				if(!bin.IsWholeBinEmpty() && !bin.GetVoxelExists(localVoxelIndex)) {
-					continue;
-				}
-
-				Vector3 voxelWorldPos = Bin.GetVoxelWorldPos(binIndex, localVoxelIndex, binGridDimensions, voxelGrid.GetMeshTransform());
-				b.center = voxelWorldPos;
-
-				if(b.IntersectRay(ray)) {
-					hitVoxels.Add(Bin.GetVoxelGlobalCoords(binIndex, localVoxelIndex, binGridDimensions));
-					hitVoxelsWorldPositions.Add(voxelWorldPos);
-				}
-			}
-		}
-
-        if(isInstant) {
-			for(int i = 0; i < hitVoxels.Count; i++) {
-				voxelGrid.SetVoxelExists(hitVoxels[i], exists: false);
-			}
-		}
-        else {
-			float closestHit = Mathf.Infinity;
-			int closestHitIndex = -1;
-			for(int i = 0; i < hitVoxels.Count; i++) {
-				float dist = Vector3.Distance(Camera.main.transform.position, hitVoxelsWorldPositions[i]);
-
-				if(dist < closestHit) {
-					closestHit = dist;
-					closestHitIndex = i;
-				}
-			}
-
-			if(closestHitIndex >= 0) {
-				voxelGrid.SetVoxelExists(hitVoxels[closestHitIndex], exists: false);
-			}
+			voxelGrid.TrySetVoxelExists(lineVoxelCoords, exists: false);
+            if(!isInstant) {
+				break;
+            }
 		}
     }
 }

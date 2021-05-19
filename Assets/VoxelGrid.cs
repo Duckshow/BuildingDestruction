@@ -4,6 +4,9 @@ using System.Collections.Generic;
 [RequireComponent(typeof(VoxelBuilder), typeof(Rigidbody))]
 public partial class VoxelGrid : MonoBehaviour
 {
+    public enum UpdateState { UpToDate, AwaitingUpdate }
+    public UpdateState State { get; private set; }
+
     [SerializeField] private Transform meshTransform;
     [SerializeField, HideInInspector] private bool isOriginal = true; // TODO: this should be removed once we have a more permanent way of saving and loading buildings
 
@@ -19,6 +22,8 @@ public partial class VoxelGrid : MonoBehaviour
 
     private bool isStatic;
 
+    private Callback onUpdated;
+
 
     private void Awake() {
         voxelBuilder = GetComponent<VoxelBuilder>();
@@ -27,7 +32,7 @@ public partial class VoxelGrid : MonoBehaviour
 
     private void Start() {
         if(isOriginal) {
-            Vector3Int voxelGridDimensions = new Vector3Int(16, 16, 16);
+            Vector3Int voxelGridDimensions = new Vector3Int(32, 64, 32);
             int voxelCount = voxelGridDimensions.x * voxelGridDimensions.y * voxelGridDimensions.z;
 
             binGridDimensions = voxelGridDimensions / Bin.WIDTH;
@@ -82,30 +87,11 @@ public partial class VoxelGrid : MonoBehaviour
         }
     }
 
-    public void ApplyCluster(VoxelCluster voxelCluster) {
-        isStatic = isOriginal ? true : voxelCluster.ShouldBeStatic(isStatic);
-
-        Vector3 GetLocalPosWithWorldRotation(Vector3 localPos, Transform t) {
-            return (t.TransformPoint(localPos) - t.position);
-        }
-        
-        Vector3 pivot = GetPivot(voxelCluster.Bins, voxelCluster.Dimensions, isStatic);
-
-        meshTransform.position += GetLocalPosWithWorldRotation(voxelCluster.VoxelOffset, meshTransform);
-        meshTransform.parent = null;
-        transform.position = meshTransform.position + GetLocalPosWithWorldRotation(pivot, meshTransform);
-        meshTransform.parent = transform;
-
-        binGridDimensions = voxelCluster.Dimensions;
-        bins = voxelCluster.Bins;
-
-        voxelBuilder.Refresh();
-    }
-
     private void LateUpdate() {
+        State = dirtyBins.Count > 0 ? UpdateState.AwaitingUpdate : UpdateState.UpToDate;
         rigidbody.isKinematic = isStatic;
 
-        if(dirtyBins.Count == 0) {
+        if(State == UpdateState.UpToDate) {
             return;
         }
 
@@ -117,6 +103,40 @@ public partial class VoxelGrid : MonoBehaviour
         }
 
         UpdateDirtyBinsAndVoxels();
+    }
+
+    public void SubscribeToOnUpdate(Callback subscriber) {
+        onUpdated += subscriber;
+    }
+
+    public void UnsubscribeToOnUpdate(Callback subscriber) {
+        onUpdated -= subscriber;
+    }
+
+    public void ApplyCluster(VoxelCluster voxelCluster) {
+        isStatic = isOriginal ? true : voxelCluster.ShouldBeStatic(isStatic);
+
+        Vector3 GetLocalPosWithWorldRotation(Vector3 localPos, Transform t) {
+            return (t.TransformPoint(localPos) - t.position);
+        }
+
+        Vector3 pivot = GetPivot(voxelCluster.Bins, voxelCluster.Dimensions, isStatic);
+
+        //meshTransform.position += GetLocalPosWithWorldRotation(voxelCluster.VoxelOffset, meshTransform);
+        //meshTransform.parent = null;
+        //transform.position = meshTransform.position + GetLocalPosWithWorldRotation(pivot, meshTransform);
+        //meshTransform.parent = transform;
+
+        meshTransform.position += GetLocalPosWithWorldRotation(voxelCluster.VoxelOffset, meshTransform);
+        
+        Vector3 cachedMeshTransformPos = meshTransform.position;
+        transform.position = meshTransform.position + GetLocalPosWithWorldRotation(pivot, meshTransform);
+        meshTransform.position = cachedMeshTransformPos;
+
+        binGridDimensions = voxelCluster.Dimensions;
+        bins = voxelCluster.Bins;
+
+        voxelBuilder.Refresh();
     }
 
     public void MarkAsCopy() {
@@ -155,19 +175,22 @@ public partial class VoxelGrid : MonoBehaviour
         return bins[index];
     }
 
-    private bool GetVoxelExists(Vector3Int voxelCoords) {
+    public bool GetVoxelExists(Vector3Int voxelCoords) {
         return GetVoxelExists(voxelCoords, bins, binGridDimensions);
     }
 
-    public void SetVoxelExists(Vector3Int voxelCoords, bool exists) {
+    public void TrySetVoxelExists(Vector3Int voxelCoords, bool exists) {
 
         int binIndex, localVoxelIndex;
         if(!GetBinAndVoxelIndex(voxelCoords, bins, binGridDimensions, out binIndex, out localVoxelIndex)) {
             return;
         }
 
+        if(!GetVoxelExists(voxelCoords)) {
+            return;
+        }
+
         Bin.SetBinVoxelExists(bins, binIndex, localVoxelIndex, exists);
-        
         TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.None);
         TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Right);
         TryGetOrCreateVoxelAndSetDirty(voxelCoords, bins, binGridDimensions, dirtyBins, Direction.Left);
@@ -236,5 +259,19 @@ public partial class VoxelGrid : MonoBehaviour
         }
 
         VoxelClusterHandler.FindVoxelClustersAndSplit(this, newlyCleanedBins);
+
+        if(onUpdated != null) {
+            onUpdated();
+        }
+    }
+
+    public Vector3Int GetVoxelCoordsFromWorldPos(Vector3 worldPos) {
+        Vector3 targetLocalPos = meshTransform.InverseTransformPoint(worldPos);
+        
+        return new Vector3Int(
+            Mathf.FloorToInt(targetLocalPos.x + 0.5f), 
+            Mathf.FloorToInt(targetLocalPos.y + 0.5f), 
+            Mathf.FloorToInt(targetLocalPos.z + 0.5f)
+        );
     }
 }

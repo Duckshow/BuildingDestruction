@@ -39,7 +39,7 @@ public class VoxelBuilder : MonoBehaviour {
 			Bin bin = voxelGrid.GetBin(i);
 
 			if(VoxelMeshFactory.TryGetMesh(bin, out meshes[i]) && meshObjects[i] == null) {
-				meshObjects[i] = Instantiate(meshObjectPrefab, meshTransform).GetComponent<MeshObject>();
+				meshObjects[i] = Instantiate(meshObjectPrefab, meshTransform).GetComponent<MeshObject>(); // TODO: make a global meshobject pool
 			}
 		}
 

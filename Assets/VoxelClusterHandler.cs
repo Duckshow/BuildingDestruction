@@ -64,7 +64,10 @@ public static partial class VoxelClusterHandler {
                     return;
                 }
 
-                int neighborIndex = VoxelGrid.CoordsToIndex(centerBin.Coords + Utils.GetDirectionVector(direction), binGridDimension);
+                Vector3Int dirVec = Utils.GetDirectionVector(direction);
+                Vector3Int neighborCoords = new Vector3Int(centerBin.Coords.x + dirVec.x, centerBin.Coords.y + dirVec.y, centerBin.Coords.z + dirVec.z);
+                
+                int neighborIndex = VoxelGrid.CoordsToIndex(neighborCoords, binGridDimension);
                 if(neighborIndex == -1) {
                     return;
                 }
