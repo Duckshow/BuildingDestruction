@@ -32,6 +32,11 @@ public class UnitTester : MonoBehaviour
         VoxelClusterHandler.RunTests();
     }
 
+    [EasyButtons.Button]
+    public void TestOctree() {
+        Octree.RunTests();
+    }
+
     public static void Assert(string testName, bool result, bool expectedResult, params Parameter[] parameters) {
         Debug.Assert(result == expectedResult, GetMessage(testName, result, expectedResult, parameters));
     }
