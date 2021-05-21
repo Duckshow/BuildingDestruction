@@ -38,285 +38,287 @@ public static partial class VoxelClusterHandler {
     }
 
     private static void TestTryFindCluster() {
-        Vector3Int binGridDimensions = new Vector3Int(3, 3, 3);
-        int binCount = binGridDimensions.x * binGridDimensions.y * binGridDimensions.z;
+        throw new System.NotImplementedException();
+
+        //Vector3Int binGridDimensions = new Vector3Int(3, 3, 3);
+        //int binCount = binGridDimensions.x * binGridDimensions.y * binGridDimensions.z;
         
-        Bin[] bins;
-        bool[] visitedBins;
-        VoxelCluster cluster0, cluster1;
+        //Bin[] bins;
+        //bool[] visitedBins;
+        //VoxelCluster cluster0, cluster1;
 
-        // ================ Test solid block ================ 
+        //// ================ Test solid block ================ 
 
-        bins = new Bin[binCount];
-        visitedBins = new bool[binCount];
+        //bins = new Bin[binCount];
+        //visitedBins = new bool[binCount];
 
-        for(int i = 0; i < binCount; i++) {
-            AddBin(VoxelGrid.IndexToCoords(i, binGridDimensions));
-        }
-        RefreshBinGridConnectivity(bins, binGridDimensions);
+        //for(int i = 0; i < binCount; i++) {
+        //    AddBin(VoxelGrid.IndexToCoords(i, binGridDimensions));
+        //}
+        //RefreshBinGridConnectivity(bins, binGridDimensions);
 
-        cluster0 = TryFindCluster(0, bins, binGridDimensions, visitedBins);
+        //cluster0 = TryFindCluster(0, bins, binGridDimensions, visitedBins);
 
-        UnitTester.Assert(
-            "Testing Solid Block, Cluster Bin Count", 
-            cluster0.Bins.Length == binCount, 
-            expectedResult: true, 
-            new UnitTester.Parameter("Cluster Bin Count", cluster0.Bins.Length), 
-            new UnitTester.Parameter("Expected Bin Count", binCount)
-        );
+        //UnitTester.Assert(
+        //    "Testing Solid Block, Cluster Bin Count", 
+        //    cluster0.Bins.Length == binCount, 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Cluster Bin Count", cluster0.Bins.Length), 
+        //    new UnitTester.Parameter("Expected Bin Count", binCount)
+        //);
 
-        UnitTester.Assert(
-            "Testing Solid Block, Cluster Dimensions", 
-            cluster0.Dimensions == binGridDimensions, 
-            expectedResult: true, 
-            new UnitTester.Parameter("Cluster Dimensions", cluster0.Dimensions), 
-            new UnitTester.Parameter("Expected Dimensions", binGridDimensions)
-        );
+        //UnitTester.Assert(
+        //    "Testing Solid Block, Cluster Dimensions", 
+        //    cluster0.Dimensions == binGridDimensions, 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Cluster Dimensions", cluster0.Dimensions), 
+        //    new UnitTester.Parameter("Expected Dimensions", binGridDimensions)
+        //);
 
-        UnitTester.Assert(
-            "Testing Solid Block, Cluster Offset",
-            cluster0.VoxelOffset == Vector3Int.zero,
-            expectedResult: true,
-            new UnitTester.Parameter("Cluster Offset", cluster0.VoxelOffset),
-            new UnitTester.Parameter("Expected Offset", Vector3Int.zero)
-        );
+        //UnitTester.Assert(
+        //    "Testing Solid Block, Cluster Offset",
+        //    cluster0.VoxelOffset == Vector3Int.zero,
+        //    expectedResult: true,
+        //    new UnitTester.Parameter("Cluster Offset", cluster0.VoxelOffset),
+        //    new UnitTester.Parameter("Expected Offset", Vector3Int.zero)
+        //);
 
-        // ================ Test arch-shape ================ 
+        //// ================ Test arch-shape ================ 
 
-        bins = new Bin[binCount];
-        visitedBins = new bool[binCount];
+        //bins = new Bin[binCount];
+        //visitedBins = new bool[binCount];
 
-        AddBin(new Vector3Int(0, 0, 0));
-        AddBin(new Vector3Int(0, 0, 1));
-        AddBin(new Vector3Int(0, 0, 2));
+        //AddBin(new Vector3Int(0, 0, 0));
+        //AddBin(new Vector3Int(0, 0, 1));
+        //AddBin(new Vector3Int(0, 0, 2));
 
-        AddBin(new Vector3Int(0, 1, 0));
-        AddBin(new Vector3Int(0, 1, 1));
-        AddBin(new Vector3Int(0, 1, 2));
+        //AddBin(new Vector3Int(0, 1, 0));
+        //AddBin(new Vector3Int(0, 1, 1));
+        //AddBin(new Vector3Int(0, 1, 2));
 
-        AddBin(new Vector3Int(0, 2, 0));
-        AddBin(new Vector3Int(0, 2, 1));
-        AddBin(new Vector3Int(0, 2, 2));
+        //AddBin(new Vector3Int(0, 2, 0));
+        //AddBin(new Vector3Int(0, 2, 1));
+        //AddBin(new Vector3Int(0, 2, 2));
 
-        AddBin(new Vector3Int(1, 2, 0));
-        AddBin(new Vector3Int(1, 2, 1));
-        AddBin(new Vector3Int(1, 2, 2));
+        //AddBin(new Vector3Int(1, 2, 0));
+        //AddBin(new Vector3Int(1, 2, 1));
+        //AddBin(new Vector3Int(1, 2, 2));
 
-        AddBin(new Vector3Int(2, 0, 0));
-        AddBin(new Vector3Int(2, 0, 1));
-        AddBin(new Vector3Int(2, 0, 2));
+        //AddBin(new Vector3Int(2, 0, 0));
+        //AddBin(new Vector3Int(2, 0, 1));
+        //AddBin(new Vector3Int(2, 0, 2));
 
-        AddBin(new Vector3Int(2, 1, 0));
-        AddBin(new Vector3Int(2, 1, 1));
-        AddBin(new Vector3Int(2, 1, 2));
+        //AddBin(new Vector3Int(2, 1, 0));
+        //AddBin(new Vector3Int(2, 1, 1));
+        //AddBin(new Vector3Int(2, 1, 2));
 
-        AddBin(new Vector3Int(2, 2, 0));
-        AddBin(new Vector3Int(2, 2, 1));
-        AddBin(new Vector3Int(2, 2, 2));
+        //AddBin(new Vector3Int(2, 2, 0));
+        //AddBin(new Vector3Int(2, 2, 1));
+        //AddBin(new Vector3Int(2, 2, 2));
 
-        RefreshBinGridConnectivity(bins, binGridDimensions);
+        //RefreshBinGridConnectivity(bins, binGridDimensions);
 
-        cluster0 = TryFindCluster(0, bins, binGridDimensions, visitedBins);
+        //cluster0 = TryFindCluster(0, bins, binGridDimensions, visitedBins);
 
-        UnitTester.Assert(
-            "Testing Arch Block, Cluster Bin Count", 
-            cluster0.Bins.Length == cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z, 
-            expectedResult: true, 
-            new UnitTester.Parameter("Cluster Bin Count", cluster0.Bins.Length), 
-            new UnitTester.Parameter("Expected Bin Count", cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z)
-        );
+        //UnitTester.Assert(
+        //    "Testing Arch Block, Cluster Bin Count", 
+        //    cluster0.Bins.Length == cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z, 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Cluster Bin Count", cluster0.Bins.Length), 
+        //    new UnitTester.Parameter("Expected Bin Count", cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z)
+        //);
 
-        UnitTester.Assert(
-            "Testing Arch Block, Cluster Dimensions", 
-            cluster0.Dimensions == binGridDimensions, 
-            expectedResult: true, 
-            new UnitTester.Parameter("Cluster Dimensions", cluster0.Dimensions), 
-            new UnitTester.Parameter("Expected Dimensions", binGridDimensions)
-        );
+        //UnitTester.Assert(
+        //    "Testing Arch Block, Cluster Dimensions", 
+        //    cluster0.Dimensions == binGridDimensions, 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Cluster Dimensions", cluster0.Dimensions), 
+        //    new UnitTester.Parameter("Expected Dimensions", binGridDimensions)
+        //);
 
-        UnitTester.Assert(
-            "Testing Arch Block, Cluster Offset",
-            cluster0.VoxelOffset == Vector3Int.zero,
-            expectedResult: true,
-            new UnitTester.Parameter("Cluster Offset", cluster0.VoxelOffset),
-            new UnitTester.Parameter("Expected Offset", Vector3Int.zero)
-        );
+        //UnitTester.Assert(
+        //    "Testing Arch Block, Cluster Offset",
+        //    cluster0.VoxelOffset == Vector3Int.zero,
+        //    expectedResult: true,
+        //    new UnitTester.Parameter("Cluster Offset", cluster0.VoxelOffset),
+        //    new UnitTester.Parameter("Expected Offset", Vector3Int.zero)
+        //);
 
-        // ================ Test two clusters touching diagonally ================ 
+        //// ================ Test two clusters touching diagonally ================ 
 
-        bins = new Bin[binCount];
-        visitedBins = new bool[binCount];
+        //bins = new Bin[binCount];
+        //visitedBins = new bool[binCount];
 
-        AddBin(new Vector3Int(0, 0, 0));
-        AddBin(new Vector3Int(0, 0, 1));
-        AddBin(new Vector3Int(0, 0, 2));
+        //AddBin(new Vector3Int(0, 0, 0));
+        //AddBin(new Vector3Int(0, 0, 1));
+        //AddBin(new Vector3Int(0, 0, 2));
 
-        AddBin(new Vector3Int(1, 1, 0));
-        AddBin(new Vector3Int(1, 1, 1));
-        AddBin(new Vector3Int(1, 1, 2));
+        //AddBin(new Vector3Int(1, 1, 0));
+        //AddBin(new Vector3Int(1, 1, 1));
+        //AddBin(new Vector3Int(1, 1, 2));
 
-        AddBin(new Vector3Int(2, 0, 0));
-        AddBin(new Vector3Int(2, 0, 1));
-        AddBin(new Vector3Int(2, 0, 2));
+        //AddBin(new Vector3Int(2, 0, 0));
+        //AddBin(new Vector3Int(2, 0, 1));
+        //AddBin(new Vector3Int(2, 0, 2));
 
-        AddBin(new Vector3Int(2, 1, 0));
-        AddBin(new Vector3Int(2, 1, 1));
-        AddBin(new Vector3Int(2, 1, 2));
+        //AddBin(new Vector3Int(2, 1, 0));
+        //AddBin(new Vector3Int(2, 1, 1));
+        //AddBin(new Vector3Int(2, 1, 2));
 
-        AddBin(new Vector3Int(2, 2, 0));
-        AddBin(new Vector3Int(2, 2, 1));
-        AddBin(new Vector3Int(2, 2, 2));
+        //AddBin(new Vector3Int(2, 2, 0));
+        //AddBin(new Vector3Int(2, 2, 1));
+        //AddBin(new Vector3Int(2, 2, 2));
 
-        RefreshBinGridConnectivity(bins, binGridDimensions);
+        //RefreshBinGridConnectivity(bins, binGridDimensions);
 
-        cluster0 = TryFindCluster(VoxelGrid.CoordsToIndex(new Vector3Int(0, 0, 0), binGridDimensions), bins, binGridDimensions, visitedBins);
-        cluster1 = TryFindCluster(VoxelGrid.CoordsToIndex(new Vector3Int(1, 1, 0), binGridDimensions), bins, binGridDimensions, visitedBins);
+        //cluster0 = TryFindCluster(VoxelGrid.CoordsToIndex(new Vector3Int(0, 0, 0), binGridDimensions), bins, binGridDimensions, visitedBins);
+        //cluster1 = TryFindCluster(VoxelGrid.CoordsToIndex(new Vector3Int(1, 1, 0), binGridDimensions), bins, binGridDimensions, visitedBins);
 
-        //for(int i = 0; i < cluster1.Bins.Length; i++) {
-        //    if(cluster1.Bins[i] == null) {
-        //        continue;
-        //    }
+        ////for(int i = 0; i < cluster1.Bins.Length; i++) {
+        ////    if(cluster1.Bins[i] == null) {
+        ////        continue;
+        ////    }
 
-        //    Debug.Log(cluster1.Bins[i].Index + ", " + cluster1.Bins[i].Coords);
+        ////    Debug.Log(cluster1.Bins[i].Index + ", " + cluster1.Bins[i].Coords);
+        ////}
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally, Cluster #1 Bin Count", 
+        //    cluster0.Bins.Length == cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z, 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Bin Count", cluster0.Bins.Length), 
+        //    new UnitTester.Parameter("Expected Count", cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z)
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally, Cluster #2 Bin Count",
+        //    cluster1.Bins.Length == cluster1.Dimensions.x * cluster1.Dimensions.y * cluster1.Dimensions.z,
+        //    expectedResult: true,
+        //    new UnitTester.Parameter("Bin Count", cluster1.Bins.Length),
+        //    new UnitTester.Parameter("Expected Count", cluster1.Dimensions.x * cluster1.Dimensions.y * cluster1.Dimensions.z)
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally, Cluster #1 Dimensions", 
+        //    cluster0.Dimensions == new Vector3Int(1, 1, 3), 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Dimensions", cluster0.Dimensions), 
+        //    new UnitTester.Parameter("Expected Dimensions", new Vector3Int(1, 1, 3))
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally, Cluster #2 Dimensions", 
+        //    cluster1.Dimensions == new Vector3Int(2, 3, 3), 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Dimensions", cluster1.Dimensions), 
+        //    new UnitTester.Parameter("Expected Dimensions", new Vector3Int(2, 3, 3))
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally, Cluster #1 Offset",
+        //    cluster0.VoxelOffset == Vector3Int.zero,
+        //    expectedResult: true,
+        //    new UnitTester.Parameter("Offset", cluster0.VoxelOffset),
+        //    new UnitTester.Parameter("Expected Offset", Vector3Int.zero)
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally, Cluster #2 Offset",
+        //    cluster1.VoxelOffset == new Vector3Int(1, 0, 0) * Bin.WIDTH,
+        //    expectedResult: true,
+        //    new UnitTester.Parameter("Offset", cluster1.VoxelOffset),
+        //    new UnitTester.Parameter("Expected Offset", new Vector3Int(1, 0, 0) * Bin.WIDTH)
+        //);
+
+        //// ================ Test two clusters touching... diagonally diagonally ================ 
+
+        //bins = new Bin[binCount];
+        //visitedBins = new bool[binCount];
+
+        //AddBin(new Vector3Int(0, 0, 2));
+
+        //AddBin(new Vector3Int(1, 1, 1));
+
+        //AddBin(new Vector3Int(2, 0, 0));
+        //AddBin(new Vector3Int(2, 0, 1));
+        //AddBin(new Vector3Int(2, 0, 2));
+
+        //AddBin(new Vector3Int(2, 1, 0));
+        //AddBin(new Vector3Int(2, 1, 1));
+        //AddBin(new Vector3Int(2, 1, 2));
+
+        //AddBin(new Vector3Int(2, 2, 0));
+        //AddBin(new Vector3Int(2, 2, 1));
+        //AddBin(new Vector3Int(2, 2, 2));
+
+        //RefreshBinGridConnectivity(bins, binGridDimensions);
+
+        //cluster0 = TryFindCluster(VoxelGrid.CoordsToIndex(new Vector3Int(0, 0, 2), binGridDimensions), bins, binGridDimensions, visitedBins);
+        //cluster1 = TryFindCluster(VoxelGrid.CoordsToIndex(new Vector3Int(1, 1, 1), binGridDimensions), bins, binGridDimensions, visitedBins);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally Diagonally, Cluster #1 Bin Count", 
+        //    cluster0.Bins.Length == cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z, 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Bin Count", cluster0.Bins.Length), 
+        //    new UnitTester.Parameter("Expected Count", cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z)
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally Diagonally, Cluster #2 Bin Count",
+        //    cluster1.Bins.Length == cluster1.Dimensions.x * cluster1.Dimensions.y * cluster1.Dimensions.z,
+        //    expectedResult: true,
+        //    new UnitTester.Parameter("Bin Count", cluster1.Bins.Length),
+        //    new UnitTester.Parameter("Expected Count", cluster1.Dimensions.x * cluster1.Dimensions.y * cluster1.Dimensions.z)
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally Diagonally, Cluster #1 Dimensions", 
+        //    cluster0.Dimensions == new Vector3Int(1, 1, 1), 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Dimensions", cluster0.Dimensions), 
+        //    new UnitTester.Parameter("Expected Dimensions", new Vector3Int(1, 1, 1))
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally Diagonally, Cluster #2 Dimensions", 
+        //    cluster1.Dimensions == new Vector3Int(2, 3, 3), 
+        //    expectedResult: true, 
+        //    new UnitTester.Parameter("Dimensions", cluster1.Dimensions), 
+        //    new UnitTester.Parameter("Expected Dimensions", new Vector3Int(2, 3, 3))
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally Diagonally, Cluster #1 Offset",
+        //    cluster0.VoxelOffset == new Vector3Int(0, 0, 2) * Bin.WIDTH,
+        //    expectedResult: true,
+        //    new UnitTester.Parameter("Offset", cluster0.VoxelOffset),
+        //    new UnitTester.Parameter("Expected Offset", new Vector3Int(0, 0, 2) * Bin.WIDTH)
+        //);
+
+        //UnitTester.Assert(
+        //    "Testing Two Clusters Touching Diagonally Diagonally, Cluster #2 Offset",
+        //    cluster1.VoxelOffset == new Vector3Int(1, 0, 0) * Bin.WIDTH,
+        //    expectedResult: true,
+        //    new UnitTester.Parameter("Offset", cluster1.VoxelOffset),
+        //    new UnitTester.Parameter("Expected Offset", new Vector3Int(1, 0, 0) * Bin.WIDTH)
+        //);
+
+        //void AddBin(Vector3Int newBinCoords) {
+        //    int binIndex = VoxelGrid.CoordsToIndex(newBinCoords, binGridDimensions);
+        //    bins[binIndex] = new Bin(binIndex, binGridDimensions);
+        //    Bin.SetBinAllVoxelsExists(bins, binIndex, exists: true);
         //}
 
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally, Cluster #1 Bin Count", 
-            cluster0.Bins.Length == cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z, 
-            expectedResult: true, 
-            new UnitTester.Parameter("Bin Count", cluster0.Bins.Length), 
-            new UnitTester.Parameter("Expected Count", cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z)
-        );
+        //static void RefreshBinGridConnectivity(Bin[] bins, Vector3Int binGridDimensions) {
+        //    for(int i = 0; i < bins.Length; i++) {
+        //        if(bins[i].IsWholeBinEmpty()) {
+        //            continue;
+        //        }
 
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally, Cluster #2 Bin Count",
-            cluster1.Bins.Length == cluster1.Dimensions.x * cluster1.Dimensions.y * cluster1.Dimensions.z,
-            expectedResult: true,
-            new UnitTester.Parameter("Bin Count", cluster1.Bins.Length),
-            new UnitTester.Parameter("Expected Count", cluster1.Dimensions.x * cluster1.Dimensions.y * cluster1.Dimensions.z)
-        );
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally, Cluster #1 Dimensions", 
-            cluster0.Dimensions == new Vector3Int(1, 1, 3), 
-            expectedResult: true, 
-            new UnitTester.Parameter("Dimensions", cluster0.Dimensions), 
-            new UnitTester.Parameter("Expected Dimensions", new Vector3Int(1, 1, 3))
-        );
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally, Cluster #2 Dimensions", 
-            cluster1.Dimensions == new Vector3Int(2, 3, 3), 
-            expectedResult: true, 
-            new UnitTester.Parameter("Dimensions", cluster1.Dimensions), 
-            new UnitTester.Parameter("Expected Dimensions", new Vector3Int(2, 3, 3))
-        );
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally, Cluster #1 Offset",
-            cluster0.VoxelOffset == Vector3Int.zero,
-            expectedResult: true,
-            new UnitTester.Parameter("Offset", cluster0.VoxelOffset),
-            new UnitTester.Parameter("Expected Offset", Vector3Int.zero)
-        );
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally, Cluster #2 Offset",
-            cluster1.VoxelOffset == new Vector3Int(1, 0, 0) * Bin.WIDTH,
-            expectedResult: true,
-            new UnitTester.Parameter("Offset", cluster1.VoxelOffset),
-            new UnitTester.Parameter("Expected Offset", new Vector3Int(1, 0, 0) * Bin.WIDTH)
-        );
-
-        // ================ Test two clusters touching... diagonally diagonally ================ 
-
-        bins = new Bin[binCount];
-        visitedBins = new bool[binCount];
-
-        AddBin(new Vector3Int(0, 0, 2));
-
-        AddBin(new Vector3Int(1, 1, 1));
-
-        AddBin(new Vector3Int(2, 0, 0));
-        AddBin(new Vector3Int(2, 0, 1));
-        AddBin(new Vector3Int(2, 0, 2));
-
-        AddBin(new Vector3Int(2, 1, 0));
-        AddBin(new Vector3Int(2, 1, 1));
-        AddBin(new Vector3Int(2, 1, 2));
-
-        AddBin(new Vector3Int(2, 2, 0));
-        AddBin(new Vector3Int(2, 2, 1));
-        AddBin(new Vector3Int(2, 2, 2));
-
-        RefreshBinGridConnectivity(bins, binGridDimensions);
-
-        cluster0 = TryFindCluster(VoxelGrid.CoordsToIndex(new Vector3Int(0, 0, 2), binGridDimensions), bins, binGridDimensions, visitedBins);
-        cluster1 = TryFindCluster(VoxelGrid.CoordsToIndex(new Vector3Int(1, 1, 1), binGridDimensions), bins, binGridDimensions, visitedBins);
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally Diagonally, Cluster #1 Bin Count", 
-            cluster0.Bins.Length == cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z, 
-            expectedResult: true, 
-            new UnitTester.Parameter("Bin Count", cluster0.Bins.Length), 
-            new UnitTester.Parameter("Expected Count", cluster0.Dimensions.x * cluster0.Dimensions.y * cluster0.Dimensions.z)
-        );
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally Diagonally, Cluster #2 Bin Count",
-            cluster1.Bins.Length == cluster1.Dimensions.x * cluster1.Dimensions.y * cluster1.Dimensions.z,
-            expectedResult: true,
-            new UnitTester.Parameter("Bin Count", cluster1.Bins.Length),
-            new UnitTester.Parameter("Expected Count", cluster1.Dimensions.x * cluster1.Dimensions.y * cluster1.Dimensions.z)
-        );
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally Diagonally, Cluster #1 Dimensions", 
-            cluster0.Dimensions == new Vector3Int(1, 1, 1), 
-            expectedResult: true, 
-            new UnitTester.Parameter("Dimensions", cluster0.Dimensions), 
-            new UnitTester.Parameter("Expected Dimensions", new Vector3Int(1, 1, 1))
-        );
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally Diagonally, Cluster #2 Dimensions", 
-            cluster1.Dimensions == new Vector3Int(2, 3, 3), 
-            expectedResult: true, 
-            new UnitTester.Parameter("Dimensions", cluster1.Dimensions), 
-            new UnitTester.Parameter("Expected Dimensions", new Vector3Int(2, 3, 3))
-        );
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally Diagonally, Cluster #1 Offset",
-            cluster0.VoxelOffset == new Vector3Int(0, 0, 2) * Bin.WIDTH,
-            expectedResult: true,
-            new UnitTester.Parameter("Offset", cluster0.VoxelOffset),
-            new UnitTester.Parameter("Expected Offset", new Vector3Int(0, 0, 2) * Bin.WIDTH)
-        );
-
-        UnitTester.Assert(
-            "Testing Two Clusters Touching Diagonally Diagonally, Cluster #2 Offset",
-            cluster1.VoxelOffset == new Vector3Int(1, 0, 0) * Bin.WIDTH,
-            expectedResult: true,
-            new UnitTester.Parameter("Offset", cluster1.VoxelOffset),
-            new UnitTester.Parameter("Expected Offset", new Vector3Int(1, 0, 0) * Bin.WIDTH)
-        );
-
-        void AddBin(Vector3Int newBinCoords) {
-            int binIndex = VoxelGrid.CoordsToIndex(newBinCoords, binGridDimensions);
-            bins[binIndex] = new Bin(binIndex, binGridDimensions);
-            Bin.SetBinAllVoxelsExists(bins, binIndex, exists: true);
-        }
-
-        static void RefreshBinGridConnectivity(Bin[] bins, Vector3Int binGridDimensions) {
-            for(int i = 0; i < bins.Length; i++) {
-                if(bins[i].IsWholeBinEmpty()) {
-                    continue;
-                }
-
-                Bin.RefreshConnectivityInBin(bins, i, binGridDimensions);
-            }
-        }
+        //        Bin.RefreshConnectivityInBin(bins, i, binGridDimensions);
+        //    }
+        //}
     }
 
     private static void TestMoveBinsToNewGrid() {

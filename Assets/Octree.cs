@@ -76,20 +76,16 @@ public partial class Octree<T> where T : IEquatable<T> {
 
     public const int CHILDREN_PER_PARENT = 8;
 
-    private int size;
+    public int Size { get; private set; }
     private Node<T> root;
 
     public Octree(int size) {
-        if(size == 0 || (size & (size - 1)) != 0) {
-            throw new Exception("Octree can only use sizes that are a power-of-two! Input: " + size);
-        }
-
-        this.size = size;
+        Size = Utils.RoundUpToPOT(size);
         root = new Node<T>(null, -1, default);
     }
 
     public bool TryGetValue(int x, int y, int z, out T value, Action<int, int, int, int, int, T> debugDrawCallback) {
-        Node<T> node = TryGetNode(x, y, z, size, root, createChildrenIfMissing: false, debugDrawCallback);
+        Node<T> node = TryGetNode(x, y, z, Size, root, createChildrenIfMissing: false, debugDrawCallback);
 
         bool success = node != null && node.HasValue();
         value = success ? node.GetValue() : default;
@@ -97,7 +93,7 @@ public partial class Octree<T> where T : IEquatable<T> {
     }
 
     public void SetValue(int x, int y, int z, T value) {
-        Node<T> node = TryGetNode(x, y, z, size, root, createChildrenIfMissing: true, debugDrawCallback: null);
+        Node<T> node = TryGetNode(x, y, z, Size, root, createChildrenIfMissing: true, debugDrawCallback: null);
         if(node == null) {
             return;
         }

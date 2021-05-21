@@ -5,6 +5,7 @@ public static partial class Utils
     public static void RunTests() {
         TestGetAndSetValueFromByte();
         TestGetDirectionVector();
+        TestRoundUpToPOT();
         Debug.Log("Tests done.");
     }
 
@@ -81,5 +82,36 @@ public static partial class Utils
         RunTest(Direction.Down, Vector3Int.down);
         RunTest(Direction.Fore, Vector3Int.forward);
         RunTest(Direction.Back, Vector3Int.back);
+    }
+
+    private static void TestRoundUpToPOT() {
+        static void RunTest(int value, int expectedResult) {
+            UnitTester.Assert<int, int>(
+                "RoundUpToPOT()",
+                RoundUpToPOT,
+                new UnitTester.Parameter("Value", value),
+                expectedResult
+            );
+        }
+
+        RunTest(0, 0);
+        RunTest(1, 1);
+        RunTest(2, 2);
+
+        for(int i = 3; i <= 4; i++)         { RunTest(i, (int)Mathf.Pow(2, 2)); }
+        for(int i = 5; i <= 8; i++)         { RunTest(i, (int)Mathf.Pow(2, 3)); }
+        for(int i = 9; i <= 16; i++)        { RunTest(i, (int)Mathf.Pow(2, 4)); }
+        for(int i = 17; i <= 32; i++)       { RunTest(i, (int)Mathf.Pow(2, 5)); }
+        for(int i = 33; i <= 64; i++)       { RunTest(i, (int)Mathf.Pow(2, 6)); }
+        for(int i = 65; i <= 128; i++)      { RunTest(i, (int)Mathf.Pow(2, 7)); }
+        for(int i = 129; i <= 256; i++)     { RunTest(i, (int)Mathf.Pow(2, 8)); }
+        for(int i = 257; i <= 512; i++)     { RunTest(i, (int)Mathf.Pow(2, 9)); }
+        for(int i = 513; i <= 1024; i++)    { RunTest(i, (int)Mathf.Pow(2, 10)); }
+        for(int i = 1025; i <= 2048; i++)   { RunTest(i, (int)Mathf.Pow(2, 11)); }
+        for(int i = 2049; i <= 4096; i++)   { RunTest(i, (int)Mathf.Pow(2, 12)); }
+        for(int i = 4097; i <= 8192; i++)   { RunTest(i, (int)Mathf.Pow(2, 13)); }
+        for(int i = 8193; i <= 16384; i++)  { RunTest(i, (int)Mathf.Pow(2, 14)); }
+        for(int i = 16385; i <= 32768; i++) { RunTest(i, (int)Mathf.Pow(2, 15)); }
+        for(int i = 32769; i <= 65536; i++) { RunTest(i, (int)Mathf.Pow(2, 16)); }
     }
 }

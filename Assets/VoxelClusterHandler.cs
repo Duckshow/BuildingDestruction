@@ -15,7 +15,7 @@ public static partial class VoxelClusterHandler {
         while(newlyCleanedBins.Count > 0) {
             int binIndex = newlyCleanedBins.Dequeue();
 
-            VoxelCluster cluster = TryFindCluster(binIndex, voxelGrid.GetBins(), voxelGrid.GetBinGridDimensions(), visitedBins);
+            VoxelCluster cluster = TryFindCluster(binIndex, voxelGrid.GetBins(), voxelGrid.GetVoxelMap(), voxelGrid.GetBinGridDimensions(), visitedBins);
             if(cluster != null) {
                 clusters.Add(cluster);
             }
@@ -25,7 +25,7 @@ public static partial class VoxelClusterHandler {
         ApplyClusters(splitVoxelGrids, clusters);
     }
 
-    private static VoxelCluster TryFindCluster(int startBinIndex, Bin[] bins, Vector3Int binGridDimensions, bool[] visitedBins) {
+    private static VoxelCluster TryFindCluster(int startBinIndex, Bin[] bins, Octree<bool> voxelMap, Vector3Int binGridDimensions, bool[] visitedBins) {
         Vector3Int minCoord = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
         Vector3Int maxCoord = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
 
@@ -94,7 +94,20 @@ public static partial class VoxelClusterHandler {
         Bin[] newBins = MoveBinsToNewGrid(bins, binGridDimensions, foundBins, minCoord, maxCoord, out newDimensions);
         MarkExteriorBins(newBins, newDimensions);
 
-        return new VoxelCluster(newBins, newVoxelOffset, newDimensions);
+        Vector3Int newVoxelGridDimensions = VoxelGrid.CalculateVoxelGridDimensions(newDimensions);
+        Octree<bool> newVoxelMap = new Octree<bool>(Mathf.Max(newVoxelGridDimensions.x, Mathf.Max(newVoxelGridDimensions.y, newVoxelGridDimensions.z)));
+        for(int z = 0; z < newVoxelGridDimensions.z; z++) {
+            for(int y = 0; y < newVoxelGridDimensions.y; y++) {
+                for(int x = 0; x < newVoxelGridDimensions.x; x++) {
+                    int binIndex, localVoxelIndex;
+                    VoxelGrid.GetBinAndVoxelIndex(new Vector3Int(x, y, z), newBins, newDimensions, out binIndex, out localVoxelIndex);
+
+                    newVoxelMap.SetValue(x, y, z, newBins[binIndex].GetVoxelExists(localVoxelIndex));
+                }
+            }
+        }
+
+        return new VoxelCluster(newBins, newVoxelMap, newVoxelOffset, newDimensions);
     }
 
     private static void MarkExteriorBins(Bin[] bins, Vector3Int binGridDimensions) {
