@@ -81,20 +81,45 @@ public static class VoxelMeshFactory {
 
     private static Dictionary<ulong, Mesh> cachedMeshes = new Dictionary<ulong, Mesh>();
 
-    public static bool TryGetMesh(Bin bin, out Mesh mesh) {
-        if(bin.IsWholeBinEmpty()) {
+    public static bool TryGetMesh(Vector3Int voxelcoords, VoxelGrid voxelGrid, out Mesh mesh) {
+        if(!voxelGrid.TryGetVoxel(voxelcoords)) {
             mesh = null;
             return false;
         }
 
-        ulong id = Bin.GetVisualID(bin);
+        bool hasNeighborRight = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x + 1, voxelcoords.y, voxelcoords.z));
+        bool hasNeighborLeft  = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x - 1, voxelcoords.y, voxelcoords.z));
+        bool hasNeighborUp    = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x, voxelcoords.y + 1, voxelcoords.z));
+        bool hasNeighborDown  = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x, voxelcoords.y - 1, voxelcoords.z));
+        bool hasNeighborFore  = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x, voxelcoords.y, voxelcoords.z + 1));
+        bool hasNeighborBack  = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x, voxelcoords.y, voxelcoords.z - 1));
+
+        byte id = 0; // TODO: cache this
+        if(!hasNeighborRight) {
+            id |= 1 << 0;
+        }
+        if(!hasNeighborLeft) {
+            id |= 1 << 1;
+        }
+        if(!hasNeighborUp) {
+            id |= 1 << 2;
+        }
+        if(!hasNeighborDown) {
+            id |= 1 << 3;
+        }
+        if(!hasNeighborFore) {
+            id |= 1 << 4;
+        }
+        if(!hasNeighborBack) {
+            id |= 1 << 5;
+        }
 
         if(ShouldUseCachedMesh(id)) {
             mesh = cachedMeshes[id];
             return mesh != null;
         }
 
-        mesh = ConstructNewMesh(bin);
+        mesh = ConstructNewMesh(hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack);
         cachedMeshes.Add(id, mesh);
 
         return mesh != null;
@@ -104,39 +129,15 @@ public static class VoxelMeshFactory {
         return cachedMeshes.ContainsKey(id);
     }
 
-    private static Mesh ConstructNewMesh(Bin bin) { // TODO: come up with a solution for not having two for-loops
-        if(bin.IsWholeBinEmpty()) {
-            return null;
-        }
-
+    private static Mesh ConstructNewMesh(bool hasNeighborRight, bool hasNeighborLeft, bool hasNeighborUp, bool hasNeighborDown, bool hasNeighborFore, bool hasNeighborBack) {
         int faceCount = 0;
-        bool[] voxelHasNeighbors = new bool[Bin.SIZE * Bin.FACES];
 
-        for(int i = 0; i < Bin.SIZE; i++) {
-            if(!bin.GetVoxelExists(i)) {
-                continue;
-            }
-
-            bool hasNeighborRight = bin.GetVoxelHasNeighbor(i, Direction.Right);
-            bool hasNeighborLeft = bin.GetVoxelHasNeighbor(i, Direction.Left);
-            bool hasNeighborUp = bin.GetVoxelHasNeighbor(i, Direction.Up);
-            bool hasNeighborDown = bin.GetVoxelHasNeighbor(i, Direction.Down);
-            bool hasNeighborFore = bin.GetVoxelHasNeighbor(i, Direction.Fore);
-            bool hasNeighborBack = bin.GetVoxelHasNeighbor(i, Direction.Back);
-
-            if(hasNeighborRight) { voxelHasNeighbors[i * Bin.FACES + 0] = true; }
-            else { ++faceCount; }
-            if(hasNeighborLeft) { voxelHasNeighbors[i * Bin.FACES + 1] = true; }
-            else { ++faceCount; }
-            if(hasNeighborUp) { voxelHasNeighbors[i * Bin.FACES + 2] = true; }
-            else { ++faceCount; }
-            if(hasNeighborDown) { voxelHasNeighbors[i * Bin.FACES + 3] = true; }
-            else { ++faceCount; }
-            if(hasNeighborFore) { voxelHasNeighbors[i * Bin.FACES + 4] = true; }
-            else { ++faceCount; }
-            if(hasNeighborBack) { voxelHasNeighbors[i * Bin.FACES + 5] = true; }
-            else { ++faceCount; }
-        }
+        if(!hasNeighborRight) { ++faceCount; }
+        if(!hasNeighborLeft)  { ++faceCount; }
+        if(!hasNeighborUp)    { ++faceCount; }
+        if(!hasNeighborDown)  { ++faceCount; }
+        if(!hasNeighborFore)  { ++faceCount; }
+        if(!hasNeighborBack)  { ++faceCount; }
 
         if(faceCount == 0) {
             return null;
@@ -148,21 +149,13 @@ public static class VoxelMeshFactory {
 
         int faceIndex = 0;
         int triIndex = 0;
-        for(int i = 0; i < Bin.SIZE; i++) {
-            if(!bin.GetVoxelExists(i)) {
-                continue;
-            }
 
-            Vector3Int localCoords = Bin.GetVoxelLocalCoords(i);
-
-            if(!voxelHasNeighbors[i * Bin.FACES + 0]) { AddFace(localCoords, Direction.Right, ref faceIndex, ref triIndex, verts, uvs, tris); }
-            if(!voxelHasNeighbors[i * Bin.FACES + 1]) { AddFace(localCoords, Direction.Left, ref faceIndex, ref triIndex, verts, uvs, tris); }
-            if(!voxelHasNeighbors[i * Bin.FACES + 2]) { AddFace(localCoords, Direction.Up, ref faceIndex, ref triIndex, verts, uvs, tris); }
-            if(!voxelHasNeighbors[i * Bin.FACES + 3]) { AddFace(localCoords, Direction.Down, ref faceIndex, ref triIndex, verts, uvs, tris); }
-            if(!voxelHasNeighbors[i * Bin.FACES + 4]) { AddFace(localCoords, Direction.Fore, ref faceIndex, ref triIndex, verts, uvs, tris); }
-            if(!voxelHasNeighbors[i * Bin.FACES + 5]) { AddFace(localCoords, Direction.Back, ref faceIndex, ref triIndex, verts, uvs, tris); }
-        }
-
+        if(!hasNeighborRight)   { AddFace(Direction.Right, ref faceIndex, ref triIndex, verts, uvs, tris); }
+        if(!hasNeighborLeft)    { AddFace(Direction.Left, ref faceIndex, ref triIndex, verts, uvs, tris); }
+        if(!hasNeighborUp)      { AddFace(Direction.Up, ref faceIndex, ref triIndex, verts, uvs, tris); }
+        if(!hasNeighborDown)    { AddFace(Direction.Down, ref faceIndex, ref triIndex, verts, uvs, tris); }
+        if(!hasNeighborFore)    { AddFace(Direction.Fore, ref faceIndex, ref triIndex, verts, uvs, tris); }
+        if(!hasNeighborBack)    { AddFace(Direction.Back, ref faceIndex, ref triIndex, verts, uvs, tris); }
 
         int actualVertCount = FaceCountToVertCount(faceCount);
         for(int i = actualVertCount; i < verts.Length; i++) {
@@ -184,13 +177,13 @@ public static class VoxelMeshFactory {
         return mesh;
     }
 
-    private static void AddFace(Vector3Int voxelLocalCoords, Direction dir, ref int faceIndex, ref int triIndex, Vector3[] verts, Vector2[] uvs, int[] tris) {
+    private static void AddFace(Direction dir, ref int faceIndex, ref int triIndex, Vector3[] verts, Vector2[] uvs, int[] tris) {
         Vector3[] faceVerts = GetVertsForFace(dir);
 
-        verts[faceIndex + 0] = voxelLocalCoords + faceVerts[0];
-        verts[faceIndex + 1] = voxelLocalCoords + faceVerts[1];
-        verts[faceIndex + 2] = voxelLocalCoords + faceVerts[2];
-        verts[faceIndex + 3] = voxelLocalCoords + faceVerts[3];
+        verts[faceIndex + 0] = faceVerts[0];
+        verts[faceIndex + 1] = faceVerts[1];
+        verts[faceIndex + 2] = faceVerts[2];
+        verts[faceIndex + 3] = faceVerts[3];
 
         uvs[faceIndex + 0] = new Vector2(0, 0);
         uvs[faceIndex + 1] = new Vector2(0, 1);
@@ -232,23 +225,25 @@ public static class VoxelMeshFactory {
     }
 
     private static void TestGetMesh() {
-        Bin bin = new Bin(0, Vector3Int.one);
-        bin = Bin.SetBinAllVoxelsExists(bin, true);
+        Debug.LogError("Refactor this!");
 
-        ulong id = Bin.GetVisualID(bin);
+        //Bin bin = new Bin(0, Vector3Int.one);
+        //bin = Bin.SetBinAllVoxelsExists(bin, true);
 
-        cachedMeshes.Clear();
+        //ulong id = Bin.GetVisualID(bin);
 
-        Debug.Assert(ShouldUseCachedMesh(id) == false);
-        TryGetMesh(bin, out Mesh mesh1);
-        Debug.Assert(ShouldUseCachedMesh(id) == true);
-        TryGetMesh(bin, out Mesh mesh2);
-        Debug.Assert(ShouldUseCachedMesh(id) == true);
+        //cachedMeshes.Clear();
 
-        Debug.Assert(mesh1 != null);
-        Debug.Assert(mesh2 != null);
-        Debug.Assert(mesh1 == mesh2);
+        //Debug.Assert(ShouldUseCachedMesh(id) == false);
+        //TryGetMesh(bin, out Mesh mesh1);
+        //Debug.Assert(ShouldUseCachedMesh(id) == true);
+        //TryGetMesh(bin, out Mesh mesh2);
+        //Debug.Assert(ShouldUseCachedMesh(id) == true);
 
-        cachedMeshes.Clear();
+        //Debug.Assert(mesh1 != null);
+        //Debug.Assert(mesh2 != null);
+        //Debug.Assert(mesh1 == mesh2);
+
+        //cachedMeshes.Clear();
     }
 }
