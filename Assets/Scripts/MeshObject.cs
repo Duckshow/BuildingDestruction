@@ -1,14 +1,14 @@
 using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
-public class MeshObject : MonoBehaviour
-{
+public class MeshObject : MonoBehaviour {
+
     [SerializeField, HideInInspector] private MeshFilter meshFilter;
     [SerializeField, HideInInspector] private MeshRenderer meshRenderer;
     [SerializeField, HideInInspector] private MeshCollider meshCollider;
 
-    public void OnValidate() {
-        meshFilter = GetComponent<MeshFilter>();
+    private void OnValidate() {
+        meshFilter   = GetComponent<MeshFilter>();
         meshRenderer = GetComponent<MeshRenderer>();
         meshCollider = GetComponent<MeshCollider>();
     }

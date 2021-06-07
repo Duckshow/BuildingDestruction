@@ -1,52 +1,54 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
 
-[RequireComponent(typeof(VoxelBuilder), typeof(Rigidbody))]
-public partial class VoxelGrid : MonoBehaviour
-{
-    public enum UpdateState { UpToDate, AwaitingUpdate }
+[RequireComponent(typeof(Rigidbody))]
+public partial class VoxelGrid : MonoBehaviour {
+    private const float UPDATE_LATENCY = 0.1f;
+
+    public enum UpdateState { Clean, Dirty, Processing }
     public UpdateState State { get; private set; }
 
+    public Vector3Int StartDimensions;  // TODO: this should be removed once we have a more permanent way of saving and loading buildings
     [SerializeField] private bool debug;
-    [SerializeField] private Transform meshTransform;
     [SerializeField, HideInInspector] private bool isOriginal = true; // TODO: this should be removed once we have a more permanent way of saving and loading buildings
+    [SerializeField] private bool isStatic;
+    [SerializeField] private Octree<bool> voxelMap;
 
-    private VoxelBuilder voxelBuilder;
+    private Transform meshTransform;
     private new Rigidbody rigidbody;
+    private VoxelBuilder voxelBuilder;
 
-    private Vector3Int voxelGridDimensions;
-    private Octree<bool> voxelMap;
-
-    private const float UPDATE_LATENCY = 0.1f;
     private float timeToUpdate;
     private Queue<Vector3Int> dirtyVoxels = new Queue<Vector3Int>();
 
-    private bool isStatic;
-
-    private Callback onUpdated;
-
-
     private void Awake() {
-        voxelBuilder = GetComponent<VoxelBuilder>();
         rigidbody = GetComponent<Rigidbody>();
+
+        for(int i = 0; i < transform.childCount; i++) {
+            Transform t = transform.GetChild(i);
+            if(t.tag == "MeshTransform") {
+                meshTransform = t;
+            }
+        }
+
+        if(meshTransform == null) {
+            meshTransform = new GameObject("MeshTransform").transform;
+            meshTransform.parent = transform;
+            meshTransform.localPosition = Vector3.zero;
+        }
+
+        voxelBuilder = new VoxelBuilder(owner: this);
     }
 
     private void Start() {
         if(isOriginal) {
-            voxelGridDimensions = new Vector3Int(16, 32, 16);
-            int voxelCount = voxelGridDimensions.x * voxelGridDimensions.y * voxelGridDimensions.z;
-
-            voxelMap = new Octree<bool>(Mathf.Max(voxelGridDimensions.x, Mathf.Max(voxelGridDimensions.y, voxelGridDimensions.z)));
-
-            for(int i = 0; i < voxelCount; i++) {
-                Vector3Int voxelCoords = IndexToCoords(i, voxelGridDimensions);
-                voxelMap.SetValue(voxelCoords.x, voxelCoords.y, voxelCoords.z, true);
-            }
+            voxelMap = new Octree<bool>(Vector3Int.zero, StartDimensions, startValue: true);
 
             // this just ensures that the initial building will be in the same spot as it was placed in the editor - a bit ugly, but I haven't figured out anything better yet
-            meshTransform.localPosition = new Vector3(-(voxelGridDimensions.x / 2f), 0.5f, -(voxelGridDimensions.z / 2f));
+            meshTransform.localPosition = new Vector3(-(voxelMap.Dimensions.x / 2f), 0.5f, -(voxelMap.Dimensions.z / 2f));
 
-            ApplyCluster(new VoxelCluster(voxelMap, Vector3Int.zero, voxelGridDimensions));
+            ApplyCluster(voxelMap);
         }
     }
 
@@ -67,17 +69,22 @@ public partial class VoxelGrid : MonoBehaviour
         for(int z = 0; z < voxelMap.Size; z++) {
             for(int y = 0; y < voxelMap.Size; y++) {
                 for(int x = 0; x < voxelMap.Size; x++) {
-                    voxelMap.TryGetValue(x, y, z, out bool value, DebugDrawNode);
+                    voxelMap.TryGetValue(new Vector3Int(x, y, z), out bool value, DebugDrawNode);
                 }
             }
         }
     }
 
     private void LateUpdate() {
-        State = dirtyVoxels.Count > 0 ? UpdateState.AwaitingUpdate : UpdateState.UpToDate;
-        rigidbody.isKinematic = isStatic;
+        rigidbody.isKinematic = true;// isStatic;
 
-        if(State == UpdateState.UpToDate) {
+        if(State == UpdateState.Processing) {
+            return;
+        }
+
+        State = dirtyVoxels.Count > 0 ? UpdateState.Dirty : UpdateState.Clean; // TODO: separate UpdateState into it's own class (or interface) that handles itself
+
+        if(State == UpdateState.Clean) {
             return;
         }
 
@@ -88,34 +95,29 @@ public partial class VoxelGrid : MonoBehaviour
             timeToUpdate = Time.time + UPDATE_LATENCY;
         }
 
-        UpdateDirtyVoxels();
+        State = UpdateState.Processing;
+        VoxelClusterHandler.FindVoxelClustersAndSplit(this, dirtyVoxels, onFinished: () => {
+            State = UpdateState.Clean;
+        });
     }
 
-    public void SubscribeToOnUpdate(Callback subscriber) {
-        onUpdated += subscriber;
-    }
-
-    public void UnsubscribeToOnUpdate(Callback subscriber) {
-        onUpdated -= subscriber;
-    }
-
-    public void ApplyCluster(VoxelCluster voxelCluster) {
-        isStatic = isOriginal ? true : voxelCluster.ShouldBeStatic(isStatic);
-
+    public void ApplyCluster(Octree<bool> voxelCluster) {
+        isStatic = voxelCluster.Offset.y == 0;
+        
         Vector3 GetLocalPosWithWorldRotation(Vector3 localPos, Transform t) {
             return (t.TransformPoint(localPos) - t.position);
         }
 
-        meshTransform.position += GetLocalPosWithWorldRotation(voxelCluster.VoxelOffset, meshTransform);
+        Vector3Int oldOffset = voxelMap.Offset;
+        voxelMap = voxelCluster;
+
+        meshTransform.position += GetLocalPosWithWorldRotation(voxelMap.Offset - oldOffset, meshTransform);
         Vector3 cachedMeshTransformPos = meshTransform.position;
         
-        Vector3 pivot = GetPivot(voxelCluster.VoxelMap, voxelCluster.Dimensions, isStatic);
+        Vector3 pivot = GetPivot(voxelMap, isStatic);
         transform.position = meshTransform.position + GetLocalPosWithWorldRotation(pivot, meshTransform);
        
         meshTransform.position = cachedMeshTransformPos;
-
-        voxelGridDimensions = voxelCluster.Dimensions;
-        voxelMap = voxelCluster.VoxelMap;
 
         voxelBuilder.Refresh();
     }
@@ -136,49 +138,53 @@ public partial class VoxelGrid : MonoBehaviour
         return voxelMap;
     }
 
-    public Vector3Int GetVoxelGridDimensions() {
-        return voxelGridDimensions;
+    public Vector3Int GetDimensions() {
+        return voxelMap.Dimensions;
     }
 
     public int GetVoxelCount() { 
-        return voxelGridDimensions.x * voxelGridDimensions.y * voxelGridDimensions.z;
+        return voxelMap.Dimensions.x * voxelMap.Dimensions.y * voxelMap.Dimensions.z;
     }
 
-    public bool TryGetVoxel(Vector3Int voxelCoords) {
-        return voxelMap.TryGetValue(voxelCoords, out bool b, debugDrawCallback: null);
+    public bool TryGetVoxel(Vector3Int voxelCoords, out bool value) {
+        return voxelMap.TryGetValue(voxelCoords, out value);
     }
 
     public void TryRemoveVoxel(Vector3Int voxelCoords) {
-        if(!voxelMap.TryGetValue(voxelCoords.x, voxelCoords.y, voxelCoords.z, out bool b, debugDrawCallback: null)) {
+        TryRemoveVoxel(voxelCoords, voxelMap, dirtyVoxels);
+    }
+
+    public static void TryRemoveVoxel(Vector3Int voxelCoords, Octree<bool> voxelMap, Queue<Vector3Int> dirtyVoxels) {
+        if(!voxelMap.TryGetValue(voxelCoords, out bool doesVoxelExist) || !doesVoxelExist) {
             return;
         }
 
         voxelMap.SetValue(voxelCoords.x, voxelCoords.y, voxelCoords.z, false);
 
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.None);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Right);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Left);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Up);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Down);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Fore);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Back);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Up,   Direction.Right);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Up,   Direction.Left);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Up,   Direction.Fore);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Up,   Direction.Back);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Down, Direction.Right);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Down, Direction.Left);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Down, Direction.Fore);
-        TrySetVoxelDirty(voxelCoords, voxelMap, voxelGridDimensions, dirtyVoxels, Direction.Down, Direction.Back);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.None);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Right);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Left);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Up);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Down);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Fore);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Back);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Up, Direction.Right);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Up, Direction.Left);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Up, Direction.Fore);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Up, Direction.Back);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Down, Direction.Right);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Down, Direction.Left);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Down, Direction.Fore);
+        TrySetVoxelDirty(voxelCoords, voxelMap, dirtyVoxels, Direction.Down, Direction.Back);
 
-        static void TrySetVoxelDirty(Vector3Int voxelCoords, Octree<bool> voxelMap, Vector3Int voxelGridDimensions, Queue<Vector3Int> dirtyVoxels, Direction direction, Direction additionalDirection = Direction.None) {
+        static void TrySetVoxelDirty(Vector3Int voxelCoords, Octree<bool> voxelMap, Queue<Vector3Int> dirtyVoxels, Direction direction, Direction additionalDirection = Direction.None) {
             voxelCoords += Utils.GetDirectionVector(direction);
-            
+
             if(additionalDirection != Direction.None) {
                 voxelCoords += Utils.GetDirectionVector(additionalDirection);
             }
 
-            if(!voxelMap.TryGetValue(voxelCoords.x, voxelCoords.y, voxelCoords.z, out bool b, debugDrawCallback: null)) {
+            if(!voxelMap.TryGetValue(voxelCoords, out bool doesVoxelExist) || !doesVoxelExist) {
                 return;
             }
 
@@ -187,14 +193,6 @@ public partial class VoxelGrid : MonoBehaviour
             }
 
             dirtyVoxels.Enqueue(voxelCoords);
-        }
-    }
-
-    public void UpdateDirtyVoxels() {
-        VoxelClusterHandler.FindVoxelClustersAndSplit(this, dirtyVoxels);
-
-        if(onUpdated != null) {
-            onUpdated();
         }
     }
 
@@ -208,11 +206,11 @@ public partial class VoxelGrid : MonoBehaviour
         );
     }
 
-    private void DebugDrawNode(int nodeOffsetX, int nodeOffsetY, int nodeOffsetZ, int nodeSize, int gridSize, bool value) {
-        Random.seed = nodeOffsetX + gridSize * (nodeOffsetY + gridSize * nodeOffsetZ);
+    private void DebugDrawNode(Vector3Int nodeOffset, int nodeSize, Vector3Int dimensions, bool value, float duration) {
+        Random.seed = nodeOffset.x + dimensions.x * (nodeOffset.y + dimensions.y * nodeOffset.z);
 
         float halfSize = nodeSize * 0.5f;
-        Vector3 drawPos = new Vector3(nodeOffsetX + halfSize, nodeOffsetY + halfSize, nodeOffsetZ + halfSize);
+        Vector3 drawPos = new Vector3(nodeOffset.x + halfSize, nodeOffset.y + halfSize, nodeOffset.z + halfSize);
 
         float s = halfSize * 0.99f;
 
@@ -235,34 +233,43 @@ public partial class VoxelGrid : MonoBehaviour
 
         Color color = value ? Color.red : Color.clear;
 
-        Debug.DrawLine(leftDownBack,        leftUpBack,         color, UPDATE_LATENCY);
-        Debug.DrawLine(leftUpBack,          rightUpBack,        color, UPDATE_LATENCY);
-        Debug.DrawLine(rightUpBack,         rightDownBack,      color, UPDATE_LATENCY);
-        Debug.DrawLine(rightDownBack,       leftDownBack,       color, UPDATE_LATENCY);
+        Debug.DrawLine(leftDownBack, leftUpBack, color, duration);
+        Debug.DrawLine(leftUpBack, rightUpBack, color, duration);
+        Debug.DrawLine(rightUpBack, rightDownBack, color, duration);
+        Debug.DrawLine(rightDownBack, leftDownBack, color, duration);
 
-        Debug.DrawLine(leftDownForward,     leftUpForward,      color, UPDATE_LATENCY);
-        Debug.DrawLine(leftUpForward,       rightUpForward,     color, UPDATE_LATENCY);
-        Debug.DrawLine(rightUpForward,      rightDownForward,   color, UPDATE_LATENCY);
-        Debug.DrawLine(rightDownForward,    leftDownForward,    color, UPDATE_LATENCY);
+        Debug.DrawLine(leftDownForward, leftUpForward, color, duration);
+        Debug.DrawLine(leftUpForward, rightUpForward, color, duration);
+        Debug.DrawLine(rightUpForward, rightDownForward, color, duration);
+        Debug.DrawLine(rightDownForward, leftDownForward, color, duration);
 
-        Debug.DrawLine(leftDownBack,        leftDownForward,    color, UPDATE_LATENCY);
-        Debug.DrawLine(leftDownForward,     leftUpForward,      color, UPDATE_LATENCY);
-        Debug.DrawLine(leftUpForward,       leftUpBack,         color, UPDATE_LATENCY);
-        Debug.DrawLine(leftUpBack,          leftDownBack,       color, UPDATE_LATENCY);
+        Debug.DrawLine(leftDownBack, leftDownForward, color, duration);
+        Debug.DrawLine(leftDownForward, leftUpForward, color, duration);
+        Debug.DrawLine(leftUpForward, leftUpBack, color, duration);
+        Debug.DrawLine(leftUpBack, leftDownBack, color, duration);
 
-        Debug.DrawLine(rightDownBack,       rightDownForward,   color, UPDATE_LATENCY);
-        Debug.DrawLine(rightDownForward,    rightUpForward,     color, UPDATE_LATENCY);
-        Debug.DrawLine(rightUpForward,      rightUpBack,        color, UPDATE_LATENCY);
-        Debug.DrawLine(rightUpBack,         rightDownBack,      color, UPDATE_LATENCY);
+        Debug.DrawLine(rightDownBack, rightDownForward, color, duration);
+        Debug.DrawLine(rightDownForward, rightUpForward, color, duration);
+        Debug.DrawLine(rightUpForward, rightUpBack, color, duration);
+        Debug.DrawLine(rightUpBack, rightDownBack, color, duration);
 
-        Debug.DrawLine(leftUpBack,          leftUpForward,      color, UPDATE_LATENCY);
-        Debug.DrawLine(leftUpForward,       rightUpForward,     color, UPDATE_LATENCY);
-        Debug.DrawLine(rightUpForward,      rightUpBack,        color, UPDATE_LATENCY);
-        Debug.DrawLine(rightUpBack,         leftUpBack,         color, UPDATE_LATENCY);
+        Debug.DrawLine(leftUpBack, leftUpForward, color, duration);
+        Debug.DrawLine(leftUpForward, rightUpForward, color, duration);
+        Debug.DrawLine(rightUpForward, rightUpBack, color, duration);
+        Debug.DrawLine(rightUpBack, leftUpBack, color, duration);
 
-        Debug.DrawLine(leftDownBack,        leftDownForward,    color, UPDATE_LATENCY);
-        Debug.DrawLine(leftDownForward,     rightDownForward,   color, UPDATE_LATENCY);
-        Debug.DrawLine(rightDownForward,    rightDownBack,      color, UPDATE_LATENCY);
-        Debug.DrawLine(rightDownBack,       leftDownBack,       color, UPDATE_LATENCY);
+        Debug.DrawLine(leftDownBack, leftDownForward, color, duration);
+        Debug.DrawLine(leftDownForward, rightDownForward, color, duration);
+        Debug.DrawLine(rightDownForward, rightDownBack, color, duration);
+        Debug.DrawLine(rightDownBack, leftDownBack, color, duration);
+    }
+
+    public void GetVoxelNeighbors(Vector3Int voxelCoords, out bool hasNeighborRight, out bool hasNeighborLeft, out bool hasNeighborUp, out bool hasNeighborDown, out bool hasNeighborFore, out bool hasNeighborBack) {
+        TryGetVoxel(new Vector3Int(voxelCoords.x + 1, voxelCoords.y, voxelCoords.z), out hasNeighborRight);
+        TryGetVoxel(new Vector3Int(voxelCoords.x - 1, voxelCoords.y, voxelCoords.z), out hasNeighborLeft);
+        TryGetVoxel(new Vector3Int(voxelCoords.x, voxelCoords.y + 1, voxelCoords.z), out hasNeighborUp);
+        TryGetVoxel(new Vector3Int(voxelCoords.x, voxelCoords.y - 1, voxelCoords.z), out hasNeighborDown);
+        TryGetVoxel(new Vector3Int(voxelCoords.x, voxelCoords.y, voxelCoords.z + 1), out hasNeighborFore);
+        TryGetVoxel(new Vector3Int(voxelCoords.x, voxelCoords.y, voxelCoords.z - 1), out hasNeighborBack);
     }
 }

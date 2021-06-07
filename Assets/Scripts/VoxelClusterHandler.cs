@@ -1,111 +1,165 @@
+using System.Runtime.CompilerServices;
 using System.Collections.Generic;
+using System.Collections;
+using System;
 using UnityEngine;
 
-public static partial class VoxelClusterHandler {
+using Random = UnityEngine.Random;
+using Object = UnityEngine.Object;
 
-    private static List<VoxelCluster> clusters = new List<VoxelCluster>();
-    private static Queue<Vector3Int> voxelsToVisit = new Queue<Vector3Int>();
-    private static Queue<Vector3Int> foundVoxels = new Queue<Vector3Int>();
-    private static Queue<MoveOrder> moveOrders = new Queue<MoveOrder>();
+[assembly: InternalsVisibleTo("PlayMode")]
+public static class VoxelClusterHandler {
 
-    public static void FindVoxelClustersAndSplit(VoxelGrid voxelGrid, Queue<Vector3Int> dirtyVoxels) {
-        Octree<bool> visitedVoxels = new Octree<bool>(voxelGrid.GetVoxelMap().Size);
+    private static List<Octree<bool>> clusters = new List<Octree<bool>>();
+
+    public static void FindVoxelClustersAndSplit(VoxelGrid voxelGrid, Queue<Vector3Int> dirtyVoxels, Action onFinished) {
+        voxelGrid.StartCoroutine(FindClusters(voxelGrid.GetVoxelMap(), dirtyVoxels, debug: false, debugDrawDuration: 0f, onFinished: (List<Octree<bool>> foundClusters) => {
+            if(foundClusters.Count == 0) {
+                Object.Destroy(voxelGrid.gameObject);
+                return;
+            }
+
+            VoxelGrid[] splitVoxelGrids = TrySplit(voxelGrid, foundClusters);
+            ApplyClusters(splitVoxelGrids, foundClusters);
+
+            if(onFinished != null) {
+                onFinished();
+            }
+        }));
+    }
+
+    internal static IEnumerator FindClusters(Octree<bool> voxelMap, Queue<Vector3Int> dirtyVoxels, bool debug, float debugDrawDuration, Action<List<Octree<bool>>> onFinished) {
+        Octree<bool> visitedVoxels = new Octree<bool>(voxelMap.Offset, voxelMap.Dimensions, startValue: false);
 
         clusters.Clear();
         while(dirtyVoxels.Count > 0) {
             Vector3Int voxelCoords = dirtyVoxels.Dequeue();
 
-            VoxelCluster cluster = TryFindCluster(voxelCoords, voxelGrid.GetVoxelMap(), voxelGrid.GetVoxelGridDimensions(), visitedVoxels);
-            if(cluster != null) {
-                clusters.Add(cluster);
+            yield return TryFindCluster(voxelCoords, voxelMap, visitedVoxels, debug, debugDrawDuration, onFinished: (Octree<bool> foundCluster) => {
+                if(foundCluster != null) {
+                    clusters.Add(foundCluster);
+                }
+            });
+        }
+
+        for(int z = 0; z < voxelMap.Size; z++) {
+            for(int y = 0; y < voxelMap.Size; y++) {
+                for(int x = 0; x < voxelMap.Size; x++) {
+                    bool voxelMapSuccess = voxelMap.TryGetValue(new Vector3Int(x, y, z), out bool voxelMapValue);
+                    bool visitedVoxelsSuccess = visitedVoxels.TryGetValue(new Vector3Int(x, y, z), out bool visitedVoxelsValue);
+
+                    Debug.Assert(voxelMapSuccess == visitedVoxelsSuccess);
+                    Debug.Assert(voxelMapValue == visitedVoxelsValue, string.Format("{0} wasn't visited!", new Vector3Int(x, y, z)));
+
+                }
             }
         }
 
-        if(clusters.Count == 0) {
-            Object.Destroy(voxelGrid.gameObject);
-            return;
-        }
-
-        VoxelGrid[] splitVoxelGrids = TrySplit(voxelGrid, clusters);
-        ApplyClusters(splitVoxelGrids, clusters);
+        onFinished(clusters);
     }
 
-    public static VoxelCluster TryFindCluster(Vector3Int startVoxelCoords, Octree<bool> voxelMap, Vector3Int voxelGridDimensions, Octree<bool> visitedVoxels) {
+    private static IEnumerator TryFindCluster(Vector3Int startVoxelCoords, Octree<bool> voxelMap, Octree<bool> visitedVoxels, bool debug, float debugDrawDuration, Action<Octree<bool>> onFinished) {
+        if(!voxelMap.TryGetNode(startVoxelCoords, out Octree<bool>.Node startingNode)) {
+            yield break;
+        }
+        if(!startingNode.HasValue()) {
+            yield break;
+        }
+
+        Octree<bool> foundVoxels = new Octree<bool>(voxelMap.Offset, voxelMap.Dimensions, startValue: false);
         Vector3Int minCoord = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
         Vector3Int maxCoord = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
 
-        foundVoxels.Clear();
-        voxelsToVisit.Clear();
-        voxelsToVisit.Enqueue(startVoxelCoords);
+        Debug.Assert(voxelMap.Dimensions == visitedVoxels.Dimensions);
+        Debug.Assert(voxelMap.Dimensions == foundVoxels.Dimensions);
 
-        Debug.Log("TODO: refactor TryFindCluster!");
+        Queue<Octree<bool>.Node> voxelsToVisit = new Queue<Octree<bool>.Node>();
+        voxelsToVisit.Enqueue(startingNode);
+
+        Color clusterColor = !debug ? Color.clear : Random.ColorHSV(
+             hueMin: 0f,
+             hueMax: 1f,
+             saturationMin: 1f,
+             saturationMax: 1f,
+             valueMin: 1f,
+             valueMax: 1f
+         );
 
         while(voxelsToVisit.Count > 0) {
-            Vector3Int voxelCoords = voxelsToVisit.Dequeue();
-            if(visitedVoxels.TryGetValue(voxelCoords, out bool b1, debugDrawCallback: null)) {
-                continue;
+            if(Input.GetKey(KeyCode.LeftShift)) {
+                Debug.Log("boop");
             }
 
-            visitedVoxels.SetValue(voxelCoords, true);
-            
-            if(!voxelMap.TryGetValue(voxelCoords, out bool b2, debugDrawCallback: null)) {
-                continue;
-            }
+            bool success = GoToNextVoxel(voxelsToVisit, voxelMap, visitedVoxels, foundVoxels, ref minCoord, ref maxCoord, debug, debugDrawDuration, clusterColor);
 
-            foundVoxels.Enqueue(voxelCoords);
-
-            minCoord.x = Mathf.Min(minCoord.x, voxelCoords.x);
-            minCoord.y = Mathf.Min(minCoord.y, voxelCoords.y);
-            minCoord.z = Mathf.Min(minCoord.z, voxelCoords.z);
-            maxCoord.x = Mathf.Max(maxCoord.x, voxelCoords.x);
-            maxCoord.y = Mathf.Max(maxCoord.y, voxelCoords.y);
-            maxCoord.z = Mathf.Max(maxCoord.z, voxelCoords.z);
-
-            TryAddNeighborToVisit(voxelCoords, voxelMap, voxelGridDimensions, Direction.Right, voxelsToVisit);
-            TryAddNeighborToVisit(voxelCoords, voxelMap, voxelGridDimensions, Direction.Left,  voxelsToVisit);
-            TryAddNeighborToVisit(voxelCoords, voxelMap, voxelGridDimensions, Direction.Up,    voxelsToVisit);
-            TryAddNeighborToVisit(voxelCoords, voxelMap, voxelGridDimensions, Direction.Down,  voxelsToVisit);
-            TryAddNeighborToVisit(voxelCoords, voxelMap, voxelGridDimensions, Direction.Fore,  voxelsToVisit);
-            TryAddNeighborToVisit(voxelCoords, voxelMap, voxelGridDimensions, Direction.Back,  voxelsToVisit);
-
-            static void TryAddNeighborToVisit(Vector3Int centerCoords, Octree<bool> voxelMap, Vector3Int voxelGridDimensions, Direction direction, Queue<Vector3Int> voxelsToVisit) {
-                Vector3Int dirVec = Utils.GetDirectionVector(direction);
-                Vector3Int neighborCoords = new Vector3Int(centerCoords.x + dirVec.x, centerCoords.y + dirVec.y, centerCoords.z + dirVec.z);
-                
-                if(!VoxelGrid.AreCoordsWithinDimensions(neighborCoords, voxelGridDimensions)) {
-                    return;
-                }
-
-                voxelsToVisit.Enqueue(neighborCoords);
+            if(debug && success) {
+                yield return new WaitForSeconds(debugDrawDuration);
             }
         }
 
-        if(foundVoxels.Count == 0) {
-            return null;
+        if(foundVoxels.IsEmpty()) {
+            yield break;
         }
 
-        Vector3Int newVoxelOffset = minCoord;
-        Vector3Int newDimensions;
-        Octree<bool> newVoxelMap = MoveVoxelsToNewVoxelMap(foundVoxels, minCoord, maxCoord, out newDimensions);
+        Vector3Int newDimensions = new Vector3Int(
+            maxCoord.x - minCoord.x + 1, 
+            maxCoord.y - minCoord.y + 1, 
+            maxCoord.z - minCoord.z + 1
+        );
 
-        return new VoxelCluster(newVoxelMap, newVoxelOffset, newDimensions);
+        foundVoxels.Resize(newOffset: foundVoxels.Offset + minCoord, newDimensions);
+        onFinished(foundVoxels);
     }
 
-    public static Octree<bool> MoveVoxelsToNewVoxelMap(Queue<Vector3Int> foundVoxels, Vector3Int minCoord, Vector3Int maxCoord, out Vector3Int newVoxelGridDimensions) {
-        newVoxelGridDimensions = maxCoord - minCoord + Vector3Int.one;
-        Octree<bool> newVoxels = new Octree<bool>(Mathf.Max(newVoxelGridDimensions.x, Mathf.Max(newVoxelGridDimensions.y, newVoxelGridDimensions.z)));
+    private static bool GoToNextVoxel(Queue<Octree<bool>.Node> voxelsToVisit, Octree<bool> voxelMap, Octree<bool> visitedVoxels, Octree<bool> foundVoxels, ref Vector3Int minCoord, ref Vector3Int maxCoord, bool debug, float debugDrawDuration, Color debugColor) {
+        Octree<bool>.Node node = voxelsToVisit.Dequeue();
 
-        while(foundVoxels.Count > 0) {
-            Vector3Int oldCoords = foundVoxels.Dequeue();
-            Vector3Int newCoords = oldCoords - minCoord;
-
-            newVoxels.SetValue(newCoords, true);
+        if(!node.HasValue()) {
+            return false;
         }
 
-        return newVoxels;
+        Vector3Int nodeOffset = node.GetOffset(voxelMap.Offset);
+
+        if(visitedVoxels.TryGetValue(nodeOffset, out bool hasVisitedVoxel) && hasVisitedVoxel) {
+            return false;
+        }
+
+        visitedVoxels.SetValue(nodeOffset, true, node.Size);
+        foundVoxels.SetValue(nodeOffset, true, node.Size);
+
+        minCoord.x = Mathf.Min(minCoord.x, nodeOffset.x);
+        minCoord.y = Mathf.Min(minCoord.y, nodeOffset.y);
+        minCoord.z = Mathf.Min(minCoord.z, nodeOffset.z);
+        maxCoord.x = Mathf.Max(maxCoord.x, nodeOffset.x + node.Size - 1);
+        maxCoord.y = Mathf.Max(maxCoord.y, nodeOffset.y + node.Size - 1);
+        maxCoord.z = Mathf.Max(maxCoord.z, nodeOffset.z + node.Size - 1);
+
+        TryAddNeighbor(Direction.Right);
+        TryAddNeighbor(Direction.Left);
+        TryAddNeighbor(Direction.Up);
+        TryAddNeighbor(Direction.Down);
+        TryAddNeighbor(Direction.Fore);
+        TryAddNeighbor(Direction.Back);
+
+        void TryAddNeighbor(Direction direction) {
+            if(!voxelMap.TryGetAdjacentNodes(node, direction, out Octree<bool>.Node[] nodes, out int nodeCount)) {
+                return;
+            }
+
+            for(int i = 0; i < nodeCount; i++) {
+                voxelsToVisit.Enqueue(nodes[i]);
+            }
+        }
+
+        if(debug) {
+            voxelMap.DebugDrawOctree(Color.white, emptyNodeColor: Color.clear, debugDrawDuration);
+            foundVoxels.DebugDrawOctree(debugColor, emptyNodeColor: Color.white, debugDrawDuration);
+        }
+        
+        return true;
     }
 
-    private static VoxelGrid[] TrySplit(VoxelGrid originalVoxelGrid, List<VoxelCluster> clusters) {
+    private static VoxelGrid[] TrySplit(VoxelGrid originalVoxelGrid, List<Octree<bool>> clusters) {
         Debug.Assert(clusters.Count > 0);
 
         VoxelGrid[] voxelGrids = new VoxelGrid[clusters.Count];
@@ -121,11 +175,12 @@ public static partial class VoxelClusterHandler {
 
             for(int i = 1; i < clusters.Count; i++) {
                 GameObject go = Object.Instantiate(originalVoxelGrid.gameObject, originalVoxelGrid.transform.parent);
-                go.name = originalVoxelGrid.name + " (Cluster)";
-
+                
                 VoxelGrid newVoxelGrid = go.GetComponent<VoxelGrid>();
+                newVoxelGrid.transform.parent = originalVoxelGrid.transform.parent;
+                newVoxelGrid.transform.localPosition = originalVoxelGrid.transform.localPosition;
+                newVoxelGrid.transform.name = originalVoxelGrid.name + " (Cluster)";
                 newVoxelGrid.MarkAsCopy();
-
                 voxelGrids[i] = newVoxelGrid;
             }
 
@@ -137,7 +192,7 @@ public static partial class VoxelClusterHandler {
         return voxelGrids;
     }
 
-    private static void ApplyClusters(VoxelGrid[] voxelGrids, List<VoxelCluster> clusters) {
+    private static void ApplyClusters(VoxelGrid[] voxelGrids, List<Octree<bool>> clusters) {
         Debug.Assert(voxelGrids.Length == clusters.Count);
 
         int biggestClusterIndex = GetBiggestVoxelClusterIndex(clusters);
@@ -155,11 +210,11 @@ public static partial class VoxelClusterHandler {
         voxelGrids[0].ApplyCluster(clusters[biggestClusterIndex]);
     }
 
-    public static int GetBiggestVoxelClusterIndex(List<VoxelCluster> clusters) {
+    private static int GetBiggestVoxelClusterIndex(List<Octree<bool>> clusters) {
         int biggestClusterIndex = -1;
         int biggestClusterSize = int.MinValue;
         for(int i = 0; i < clusters.Count; i++) {
-            VoxelCluster cluster = clusters[i];
+            Octree<bool> cluster = clusters[i];
             int size = cluster.Dimensions.x * cluster.Dimensions.y * cluster.Dimensions.z;
 
             if(size > biggestClusterSize) {
@@ -171,15 +226,5 @@ public static partial class VoxelClusterHandler {
         Debug.Assert(biggestClusterIndex >= 0);
         Debug.Assert(biggestClusterIndex < clusters.Count);
         return biggestClusterIndex;
-    }
-
-    private struct MoveOrder {
-        public int TargetIndex;
-        public Direction DirectionToOrigin;
-
-        public MoveOrder(int targetIndex, Direction direction) {
-            TargetIndex = targetIndex;
-            DirectionToOrigin = Utils.GetOppositeDirection(direction);
-        }
     }
 }
