@@ -96,4 +96,14 @@ public static partial class Utils
     public static Vector3Int GetRandomVector3Int(Vector3Int min, Vector3Int max) {
         return new Vector3Int(Random.Range(min.x, max.x), Random.Range(min.y, max.y), Random.Range(min.z, max.z));
     }
+
+    public static int RoundUpToPOT(int value) {
+        --value;
+        value |= value >> 1;
+        value |= value >> 2;
+        value |= value >> 4;
+        value |= value >> 8;
+        value |= value >> 16;
+        return ++value;
+    }
 }
