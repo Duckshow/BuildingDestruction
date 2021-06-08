@@ -9,16 +9,16 @@ public class VoxelController : MonoBehaviour {
 		voxelGrid = GetComponent<VoxelGrid>();
     }
 
-	private void Update() {
+    private void Update() {
 		if(voxelGrid == null) {
 			return;
 		}
-        if(voxelGrid.State != VoxelGrid.UpdateState.UpToDate) {
+        if(voxelGrid.State != VoxelGrid.UpdateState.Clean) {
 			return;
         }
 
         if(Input.GetKeyDown(KeyCode.Space)) {
-			Vector3Int voxelGridDimensions = voxelGrid.GetVoxelGridDimensions();
+			Vector3Int voxelGridDimensions = voxelGrid.GetDimensions();
 
             for(int z = 0; z < voxelGridDimensions.z; z++) {
                 for(int y = 0; y < voxelGridDimensions.y; y++) {
@@ -42,7 +42,7 @@ public class VoxelController : MonoBehaviour {
 	}
 
 	private void FireBeam(bool isInstant) {
-		Vector3Int voxelGridDimensions = voxelGrid.GetVoxelGridDimensions();
+		Vector3Int voxelGridDimensions = voxelGrid.GetDimensions();
 
 		Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 		Vector3Int lineStartCoords = voxelGrid.GetVoxelCoordsFromWorldPos(mouseWorldPos);

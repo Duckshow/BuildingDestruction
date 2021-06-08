@@ -1,24 +1,19 @@
 using UnityEngine;
 using System.Collections;
 
-[RequireComponent(typeof(VoxelGrid))]
-public class VoxelBuilder : MonoBehaviour {
+public class VoxelBuilder {
 
-	[SerializeField] private GameObject meshObjectPrefab; // TODO: handle dependencies better
-	[SerializeField] private Material material;
-	[SerializeField] private Transform meshTransform;
+	private VoxelGrid owner;
 
-	[SerializeField, HideInInspector] private Vector3Int dimensions;
+	private Vector3Int dimensions;
 	private MeshObject[] meshObjects;
-	
-	private VoxelGrid voxelGrid;
 
-    private void Awake() {
-		voxelGrid = GetComponent<VoxelGrid>();
-    }
+	public VoxelBuilder(VoxelGrid owner) {
+		this.owner = owner;
+	}
 
     public void Refresh() {
-		Vector3Int newDimensions = voxelGrid.GetVoxelGridDimensions();
+		Vector3Int newDimensions = owner.GetDimensions();
 
 		if(dimensions == Vector3Int.zero) {
 			dimensions = newDimensions;
@@ -36,18 +31,28 @@ public class VoxelBuilder : MonoBehaviour {
 
 		Mesh[] meshes = new Mesh[newLength];
 		for(int i = 0; i < newLength; i++) {
-			if(VoxelMeshFactory.TryGetMesh(VoxelGrid.IndexToCoords(i, newDimensions), voxelGrid, out meshes[i]) && meshObjects[i] == null) {
-				meshObjects[i] = Instantiate(meshObjectPrefab, meshTransform).GetComponent<MeshObject>(); // TODO: make a global meshobject pool
+			Vector3Int voxelCoords = VoxelGrid.IndexToCoords(i, newDimensions);
+            if(!owner.TryGetVoxel(voxelCoords, out bool doesVoxelExist)) {
+				throw new System.Exception();
+            }
+            if(!doesVoxelExist) {
+				continue;
+            }
+
+			owner.GetVoxelNeighbors(voxelCoords, out bool hasNeighborRight, out bool hasNeighborLeft, out bool hasNeighborUp, out bool hasNeighborDown, out bool hasNeighborFore, out bool hasNeighborBack);
+
+			if(VoxelMeshFactory.TryGetMesh(hasNeighborRight, hasNeighborLeft, hasNeighborUp, hasNeighborDown, hasNeighborFore, hasNeighborBack, out meshes[i]) && meshObjects[i] == null) {
+				meshObjects[i] = Object.Instantiate(DependencyManager.Instance.Prefabs.MeshObject, owner.GetMeshTransform()).GetComponent<MeshObject>(); // TODO: make a global meshobject pool
 			}
 		}
 
 		for(int i = newLength; i < meshObjects.Length; i++) {
             if(meshObjects[i] != null) {
-				Destroy(meshObjects[i].gameObject);
+				Object.Destroy(meshObjects[i].gameObject);
 			}
 		}
 
- 		StartCoroutine(WaitThenFinishRefresh(meshes, meshObjects, newLength, dimensions, material));
+ 		owner.StartCoroutine(WaitThenFinishRefresh(meshes, meshObjects, newLength, dimensions, DependencyManager.Instance.Materials.Voxel));
 	}
 
 	private static IEnumerator WaitThenFinishRefresh(Mesh[] meshes, MeshObject[] meshObjects, int newMeshObjectCount, Vector3Int dimensions, Material material) {
@@ -61,7 +66,7 @@ public class VoxelBuilder : MonoBehaviour {
 
 			Mesh mesh = meshes[i];
             if(mesh == null) {
-				Destroy(meshObjects[i].gameObject);
+				Object.Destroy(meshObjects[i].gameObject);
 				continue;
             }
 

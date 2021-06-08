@@ -81,19 +81,7 @@ public static class VoxelMeshFactory {
 
     private static Dictionary<ulong, Mesh> cachedMeshes = new Dictionary<ulong, Mesh>();
 
-    public static bool TryGetMesh(Vector3Int voxelcoords, VoxelGrid voxelGrid, out Mesh mesh) {
-        if(!voxelGrid.TryGetVoxel(voxelcoords)) {
-            mesh = null;
-            return false;
-        }
-
-        bool hasNeighborRight = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x + 1, voxelcoords.y, voxelcoords.z));
-        bool hasNeighborLeft  = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x - 1, voxelcoords.y, voxelcoords.z));
-        bool hasNeighborUp    = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x, voxelcoords.y + 1, voxelcoords.z));
-        bool hasNeighborDown  = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x, voxelcoords.y - 1, voxelcoords.z));
-        bool hasNeighborFore  = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x, voxelcoords.y, voxelcoords.z + 1));
-        bool hasNeighborBack  = voxelGrid.TryGetVoxel(new Vector3Int(voxelcoords.x, voxelcoords.y, voxelcoords.z - 1));
-
+    public static bool TryGetMesh(bool hasNeighborRight, bool hasNeighborLeft, bool hasNeighborUp, bool hasNeighborDown, bool hasNeighborFore, bool hasNeighborBack, out Mesh mesh) {
         byte id = 0; // TODO: cache this
         if(!hasNeighborRight) {
             id |= 1 << 0;
