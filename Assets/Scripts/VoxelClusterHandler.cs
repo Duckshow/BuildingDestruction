@@ -49,8 +49,10 @@ public static class VoxelClusterHandler {
                     bool visitedVoxelsSuccess = visitedVoxels.TryGetValue(new Vector3Int(x, y, z), out bool visitedVoxelsValue);
 
                     Debug.Assert(voxelMapSuccess == visitedVoxelsSuccess);
-                    Debug.Assert(voxelMapValue == visitedVoxelsValue, string.Format("{0} wasn't visited!", new Vector3Int(x, y, z)));
 
+                    if(voxelMapValue && !visitedVoxelsValue) {
+                        Debug.LogError(string.Format("{0} wasn't visited!", new Vector3Int(x, y, z)));
+                    }
                 }
             }
         }
@@ -70,7 +72,10 @@ public static class VoxelClusterHandler {
         Vector3Int minCoord = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
         Vector3Int maxCoord = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
 
+        Debug.Assert(voxelMap.Offset == visitedVoxels.Offset);
         Debug.Assert(voxelMap.Dimensions == visitedVoxels.Dimensions);
+
+        Debug.Assert(voxelMap.Offset == foundVoxels.Offset);
         Debug.Assert(voxelMap.Dimensions == foundVoxels.Dimensions);
 
         Queue<Octree<bool>.Node> voxelsToVisit = new Queue<Octree<bool>.Node>();
@@ -86,10 +91,6 @@ public static class VoxelClusterHandler {
          );
 
         while(voxelsToVisit.Count > 0) {
-            if(Input.GetKey(KeyCode.LeftShift)) {
-                Debug.Log("boop");
-            }
-
             bool success = GoToNextVoxel(voxelsToVisit, voxelMap, visitedVoxels, foundVoxels, ref minCoord, ref maxCoord, debug, debugDrawDuration, clusterColor);
 
             if(debug && success) {
@@ -123,6 +124,8 @@ public static class VoxelClusterHandler {
         if(visitedVoxels.TryGetValue(nodeOffset, out bool hasVisitedVoxel) && hasVisitedVoxel) {
             return false;
         }
+
+        Debug.Assert(node.Children == null);
 
         visitedVoxels.SetValue(nodeOffset, true, node.Size);
         foundVoxels.SetValue(nodeOffset, true, node.Size);

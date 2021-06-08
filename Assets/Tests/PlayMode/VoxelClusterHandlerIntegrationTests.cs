@@ -8,48 +8,48 @@ using Assert = NUnit.Framework.Assert;
 
 public class VoxelClusterHandlerIntegrationTests {
 
-    private const float STEP_DURATION = 0f;
+    private const float STEP_DURATION = 0.1f;
 
 
     [UnityTest]
     public IEnumerator TestTryFindCluster_Split() {
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Z, 0);
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Z, 1);
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Z, 2);
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Z, 4);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Z, 0);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Z, 1);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Z, 2);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Z, 3);
 
         yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Z, 0);
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Z, 1);
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Z, 2);
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Z, 4);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Z, 1);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Z, 2);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Z, 3);
 
 
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Y, 0);
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Y, 1);
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Y, 2);
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Y, 4);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Y, 0);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Y, 1);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Y, 2);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.Y, 3);
 
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Y, 0);
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Y, 1);
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Y, 2);
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Y, 4);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Y, 0);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Y, 1);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Y, 2);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.Y, 3);
 
-        
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.X, 0);
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.X, 1);
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.X, 2);
-        yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.X, 4);
 
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.X, 0);
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.X, 1);
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.X, 2);
-        yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.X, 4);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.X, 0);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.X, 1);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.X, 2);
+        //yield return TestSplitAlongAxis(offset: Vector3Int.zero, relativeZ: Axis.X, 3);
+
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.X, 0);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.X, 1);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.X, 2);
+        //yield return TestSplitAlongAxis(offset: new Vector3Int(1, 2, 3), relativeZ: Axis.X, 3);
     }
 
     private IEnumerator TestSplitAlongAxis(Vector3Int offset, Axis relativeZ, int relXIndex) {
         Utils.GetOtherAxes(relativeZ, out Axis relativeX, out Axis relativeY);
 
-        Vector3Int dimensions = new Vector3Int(5, 5, 5);
+        Vector3Int dimensions = new Vector3Int().AsRelative(4, 5, 6, relativeX, relativeY, relativeZ);
         int width  = dimensions.Get(relativeX);
         int height = dimensions.Get(relativeY);
         int depth  = dimensions.Get(relativeZ);
@@ -59,11 +59,7 @@ public class VoxelClusterHandlerIntegrationTests {
         void ManipulateVoxels(Octree<bool> voxelMap, Queue<Vector3Int> dirtyVoxels) {
             for(int relYIndex = 0; relYIndex < height; relYIndex++) {
                 for(int relZIndex = 0; relZIndex < depth; relZIndex++) {
-                    Vector3Int pos = Vector3Int.zero;
-                    
-                    pos = pos.Set(relativeX, relXIndex);
-                    pos = pos.Set(relativeY, relYIndex);
-                    pos = pos.Set(relativeZ, relZIndex);
+                    Vector3Int pos = new Vector3Int().AsRelative(relXIndex, relYIndex, relZIndex, relativeX, relativeY, relativeZ);
 
                     VoxelGrid.TryRemoveVoxel(pos, voxelMap, dirtyVoxels);
                 }
@@ -75,15 +71,18 @@ public class VoxelClusterHandlerIntegrationTests {
                 Assert.AreEqual(1, foundClusters.Count);
 
                 Octree<bool> cluster = foundClusters[0];
-                
+
+                Debug.Log(dimensions + " -> " + width + ", " + height + ", " + depth + " -> " + cluster.Dimensions);
                 Assert.AreEqual(width - 1, cluster.Dimensions.Get(relativeX));
                 Assert.AreEqual(height,    cluster.Dimensions.Get(relativeY));
                 Assert.AreEqual(depth,     cluster.Dimensions.Get(relativeZ));
 
-                for(int z = 0; z < cluster.Dimensions.z; z++) {
-                    for(int y = 0; y < cluster.Dimensions.y; y++) {
-                        for(int x = 0; x < cluster.Dimensions.x; x++) {
-                            Assert.IsTrue(cluster.TryGetValue(new Vector3Int(x, y, z), out bool value));
+                for(int relZ = 0; relZ < cluster.Dimensions.Get(relativeZ); relZ++) {
+                    for(int relY = 0; relY < cluster.Dimensions.Get(relativeY); relY++) {
+                        for(int relX = 0; relX < cluster.Dimensions.Get(relativeX); relX++) {
+                            Vector3Int pos = new Vector3Int().AsRelative(relX, relY, relZ, relativeX, relativeY, relativeZ);
+
+                            Assert.IsTrue(cluster.TryGetValue(pos, out bool value));
                             Assert.IsTrue(value);
                         }
                     }
@@ -96,11 +95,12 @@ public class VoxelClusterHandlerIntegrationTests {
                 Octree<bool> smallerCluster = isZeroSmaller ? foundClusters[0] : foundClusters[1];
                 Octree<bool> biggerCluster = isZeroSmaller ? foundClusters[1] : foundClusters[0];
 
-                Assert.AreEqual(relXIndex,             smallerCluster.Dimensions.Get(relativeX));
+                Debug.Log(relXIndex);
+                Assert.AreEqual(1,                     smallerCluster.Dimensions.Get(relativeX));
                 Assert.AreEqual(height,                smallerCluster.Dimensions.Get(relativeY));
                 Assert.AreEqual(depth,                 smallerCluster.Dimensions.Get(relativeZ));
 
-                Assert.AreEqual(width - 1 - relXIndex, biggerCluster.Dimensions.Get(relativeX));
+                Assert.AreEqual(2,                     biggerCluster.Dimensions.Get(relativeX));
                 Assert.AreEqual(height,                biggerCluster.Dimensions.Get(relativeY));
                 Assert.AreEqual(depth,                 biggerCluster.Dimensions.Get(relativeZ));
             }
@@ -145,7 +145,7 @@ public class VoxelClusterHandlerIntegrationTests {
     private static IEnumerator TestDoubleSplitOnAxis(Vector3Int offset, Axis relativeZ, int relXIndex, int relYIndex) {
         Utils.GetOtherAxes(relativeZ, out Axis relativeX, out Axis relativeY);
 
-        Vector3Int dimensions = new Vector3Int(4, 4, 4);
+        Vector3Int dimensions = new Vector3Int(4, 5, 6);
         int width  = dimensions.Get(relativeX);
         int height = dimensions.Get(relativeY);
         int depth  = dimensions.Get(relativeZ);
@@ -278,6 +278,7 @@ public class VoxelClusterHandlerIntegrationTests {
                     }
                 }
 
+                Debug.Log(cluster);
                 clusterToManipulateNext = cluster;
             }
         }
@@ -335,19 +336,22 @@ public class VoxelClusterHandlerIntegrationTests {
 
     [UnityTest]
     public IEnumerator TestTryFindCluster_DisappearingVoxelBug() {
-        yield return TestDisappearingVoxelBug(relativeZ: Axis.Z);
+        //yield return TestDisappearingVoxelBug(relativeZ: Axis.Z);
         yield return TestDisappearingVoxelBug(relativeZ: Axis.Y);
-        yield return TestDisappearingVoxelBug(relativeZ: Axis.X);
+        //yield return TestDisappearingVoxelBug(relativeZ: Axis.X);
     }
 
     private static IEnumerator TestDisappearingVoxelBug(Axis relativeZ) {
         Utils.GetOtherAxes(relativeZ, out Axis relativeX, out Axis relativeY);
 
         Vector3Int dimensions = new Vector3Int(4, 8, 4);
+        dimensions = dimensions.Set(relativeX, 4);
+        dimensions = dimensions.Set(relativeY, 8);
+        dimensions = dimensions.Set(relativeZ, 4);
+
         int width = dimensions.Get(relativeX);
         int height = dimensions.Get(relativeY);
         int depth = dimensions.Get(relativeZ);
-
 
         Octree<bool> clusterToManipulateNext = null;
 
@@ -374,6 +378,7 @@ public class VoxelClusterHandlerIntegrationTests {
                 Assert.AreEqual(2, cluster_1.Dimensions.Get(relativeY));
                 Assert.AreEqual(depth, cluster_1.Dimensions.Get(relativeZ));
 
+
                 clusterToManipulateNext = cluster_0;
             }
         }
@@ -395,15 +400,20 @@ public class VoxelClusterHandlerIntegrationTests {
                 Assert.AreEqual(6, cluster.Dimensions.Get(relativeY));
                 Assert.AreEqual(depth, cluster.Dimensions.Get(relativeZ));
 
-                for(int z = 0; z < 4; z++) {
-                    for(int y = 0; y < 6; y++) {
-                        for(int x = 0; x < 4; x++) {
-                            if(x < 2 && y == 0 || x == 2 && y == 1) {
-                                Assert.IsTrue(cluster.TryGetValue(new Vector3Int(x, y, z), out bool value));
+                for(int relZ = 0; relZ < 4; relZ++) {
+                    for(int relY = 0; relY < 6; relY++) {
+                        for(int relX = 0; relX < 4; relX++) {
+                            Vector3Int pos = new Vector3Int();
+                            pos = pos.Set(relativeX, relX);
+                            pos = pos.Set(relativeY, relY);
+                            pos = pos.Set(relativeZ, relZ);
+
+                            if(relX < 2 && relY == 0 || relX == 2 && relY == 1) {
+                                Assert.IsTrue(cluster.TryGetValue(pos, out bool value));
                                 Assert.IsFalse(value);
                             }
                             else {
-                                Assert.IsTrue(cluster.TryGetValue(new Vector3Int(x, y, z), out bool value));
+                                Assert.IsTrue(cluster.TryGetValue(pos, out bool value));
                                 Assert.IsTrue(value);
                             }
                         }
