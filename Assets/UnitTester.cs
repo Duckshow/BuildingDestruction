@@ -34,7 +34,7 @@ public class UnitTester : MonoBehaviour
 
     [EasyButtons.Button]
     public void TestOctree() {
-        OctreeTests.RunTests();
+        Octree.RunTests();
     }
 
     public static void Assert(string testName, bool result, bool expectedResult, params Parameter[] parameters) {
