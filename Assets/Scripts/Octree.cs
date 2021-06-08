@@ -28,17 +28,9 @@ public partial class Octree<T> where T : IEquatable<T> {
         public Node(Node parent, int siblingIndex, Vector3Int fixedOffset, int size, T value) {
             this.parent = parent;
             this.siblingIndex = siblingIndex;
-
-            if(parent == null) {
-                this.fixedOffset = Vector3Int.zero; // WARNING: never offset the root, it creates hard to find bugs!
-            }
-            else {
-                this.fixedOffset = fixedOffset;
-            }
-
+            this.fixedOffset = fixedOffset;
             this.size = size;
             SetValue(value, informParent: false);
-
         }
 
         public bool HasValue() {
@@ -116,8 +108,6 @@ public partial class Octree<T> where T : IEquatable<T> {
         }
 
         public Vector3Int GetNeighborNodeOffset(Vector3Int octreeOffset, Direction direction) {
-            Debug.Log(GetOffset(octreeOffset) + ", " + GetNeighborNodeOffset(octreeOffset, fixedOffset, size, direction));
-
             return GetNeighborNodeOffset(octreeOffset, fixedOffset, size, direction);
         }
 
@@ -143,7 +133,6 @@ public partial class Octree<T> where T : IEquatable<T> {
                 nodeOffset.y + deltaY,
                 nodeOffset.z + deltaZ
             );
-
 
             return result;
         }
@@ -226,8 +215,7 @@ public partial class Octree<T> where T : IEquatable<T> {
         size = Utils.RoundUpToPOT(dimensions.Max());
         this.offset = offset;
         this.dimensions = dimensions;
-
-        root = new Node(null, -1, Vector3Int.zero, size, default);
+        root = new Node(null, -1, offset, size, default);
 
         if(EqualityComparer<T>.Default.Equals(startValue, default)) {
             return;
@@ -296,7 +284,6 @@ public partial class Octree<T> where T : IEquatable<T> {
             return;
         }
 
-        Debug.Assert(node.Size == size);
         node.SetValue(value, informParent: true);
     }
 
@@ -319,9 +306,9 @@ public partial class Octree<T> where T : IEquatable<T> {
             Vector3Int nodeOffset = node.GetOffset(octreeOffset);
 
             int childSize = node.Size / 2;
-            int childLocalCoordsX = x < nodeOffset.x + childSize ? 0 : 1;// (int)Mathf.Clamp01(Mathf.Sign(x - (fixedNodeOffset.x + childSize)));
-            int childLocalCoordsY = y < nodeOffset.y + childSize ? 0 : 1;// (int)Mathf.Clamp01(Mathf.Sign(y - (fixedNodeOffset.y + childSize)));
-            int childLocalCoordsZ = z < nodeOffset.z + childSize ? 0 : 1;// (int)Mathf.Clamp01(Mathf.Sign(z - (fixedNodeOffset.z + childSize)));
+            int childLocalCoordsX = (int)Mathf.Clamp01(Mathf.Sign(x - (nodeOffset.x + childSize)));
+            int childLocalCoordsY = (int)Mathf.Clamp01(Mathf.Sign(y - (nodeOffset.y + childSize)));
+            int childLocalCoordsZ = (int)Mathf.Clamp01(Mathf.Sign(z - (nodeOffset.z + childSize)));
 
             bool hasChildren = node.Children != null;
             if(!hasChildren && !createChildrenIfMissing) {
@@ -383,7 +370,16 @@ public partial class Octree<T> where T : IEquatable<T> {
             return false;
         }
 
-        Debug.Assert(neighbor != origin);
+        if(neighbor.GetOffset(octree.offset) == origin.GetOffset(octree.offset)) {
+
+            // NOTE: if neighbor has the same offset, it's because origin and neighbor are merged,
+            // meaning that the neighbors *exist* but they're also merged with origin
+
+            neighbors = new Node[1];
+            neighbors[0] = origin;
+            neighborCount = 1;
+            return true;
+        }
 
         Direction face = Utils.GetOppositeDirection(direction);
 

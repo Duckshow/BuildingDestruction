@@ -127,9 +127,9 @@ public static partial class Utils
             Vector3Int nodeOffset = node.GetOffset(octree.Offset);
 
             Vector3 drawPos = new Vector3(
-                octree.Offset.x + nodeOffset.x + node.Size / 2f,
-                octree.Offset.y + nodeOffset.y + node.Size / 2f,
-                octree.Offset.z + nodeOffset.z + node.Size / 2f
+                nodeOffset.x + node.Size / 2f,
+                nodeOffset.y + node.Size / 2f,
+                nodeOffset.z + node.Size / 2f
             );
 
             if(node.HasValue()) {
@@ -216,17 +216,6 @@ public static partial class Utils
             case Axis.Z: { v.z = value; break; }
         }
 
-        return v;
-    }
-
-    public static Vector3Int AsRelative(this Vector3Int v, int x, int y, int z, Axis relativeX, Axis relativeY, Axis relativeZ) {
-        Debug.Assert(relativeX != relativeY);
-        Debug.Assert(relativeY != relativeZ);
-        Debug.Assert(relativeZ != relativeX);
-
-        v = v.Set(relativeX, x);
-        v = v.Set(relativeY, y);
-        v = v.Set(relativeZ, z);
         return v;
     }
 
