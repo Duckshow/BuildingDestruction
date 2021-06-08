@@ -1,84 +1,37 @@
 using UnityEngine;
 
-public partial class Octree : MonoBehaviour
+public class Octree : MonoBehaviour
 {
     public class Node {
         public Node Parent;
         public Node[] Children;
         public int SiblingIndex = -1;
 
-        public Color? Value { get; private set; }
-
-        public Node(Node parent, int siblingIndex, Color? value) {
+        public Node(Node parent, int siblingIndex) {
             Parent = parent;
             SiblingIndex = siblingIndex;
-            SetValue(value, informParent: false);
-        }
-
-        public void SetupChildren() {
-            Children = new Node[CHILDREN_PER_PARENT];
-
-            for(int i = 0; i < CHILDREN_PER_PARENT; i++) {
-                Children[i] = new Node(this, i, Value);
-            }
-
-            ClearValue(); // no need to inform parent in this case, I'm fairly certain
-        }
-
-        public void SetValue(Color? value, bool informParent) {
-            Value = value;
-            Children = null;
-
-            if(!informParent) {
-                return;
-            }
-
-            if(Parent == null) {
-                return;
-            }
-
-            if(CanSummarizeChildren(Parent)) {
-                Parent.SetValue(value, informParent: true);
-            }
-        }
-
-        public void ClearValue() {
-            Value = null;
-        }
-
-        public static bool CanSummarizeChildren(Node parent) {
-            Node firstChild = parent.Children[0];
-
-            if(firstChild.Children != null) {
-                return false;
-            }
-
-            for(int i = 1; i < CHILDREN_PER_PARENT; i++) {
-                Node currentChild = parent.Children[i];
-
-                if(currentChild.Children != null) {
-                    return false;
-                }
-
-                if(firstChild.Value != currentChild.Value) {
-                    return false;
-                }
-            }
-
-            return true;
         }
     }
 
-    private const int CHILDREN_PER_PARENT = 8;
-
     private Node root;
     public int Size;
-    private Vector3Int coords = new Vector3Int();
+    private Vector3Int tmp = new Vector3Int();
+
+    private void OnValidate() {
+        Debug.Assert((Size != 0) && ((Size & (Size - 1)) == 0));
+    }
 
     private void Start() {
-        Debug.Assert((Size != 0) && ((Size & (Size - 1)) == 0));
 
-        root = new Node(null, -1, null);
+        root = new Node(null, -1);
+
+        //for(int z = 0; z < size.z; z += 2) {
+        //    for(int y = 0; y < size.y; y += 2) {
+        //        for(int x = 0; x < size.x; x += 2) {
+        //            Add(x, y, z);
+        //        }
+        //    }
+        //}
     }
 
     float timeToUpdate;
@@ -87,209 +40,161 @@ public partial class Octree : MonoBehaviour
             return;
         }
 
-        timeToUpdate = Time.time + 0.05f;
+        timeToUpdate = Time.time + 0f;
 
-        //TestSetValue();
-        DebugDrawGrid(Size, root);
+        //Debug.Log(tmp);
+        //TestAdd();
+        DebugDrawGrid();
     }
 
     [EasyButtons.Button]
-    public void ResetCoords() {
-        coords = Vector3Int.zero;
-    }
+    public void TestAdd() {
+        Get(tmp.x, tmp.y, tmp.z, addNewIfNull: true, debugDraw: true);
 
-    [EasyButtons.Button]
-    public void TestSetValueRed() {
-        TestSetValue(Color.red);
-    }
-
-    [EasyButtons.Button]
-    public void TestSetValueGreen() {
-        TestSetValue(Color.green);
-    }
-
-    [EasyButtons.Button]
-    public void TestSetValueBlue() {
-        TestSetValue(Color.blue);
-    }
-
-    private void TestSetValue(Color value) {
-        SetValue(coords.x, coords.y, coords.z, value);
-
-        coords.x++;
-        if(coords.x == Size) {
-            coords.x = 0;
-            coords.y++;
-            if(coords.y == Size) {
-                coords.y = 0;
-                coords.z++;
+        tmp.x++;
+        if(tmp.x == Size) {
+            tmp.x = 0;
+            tmp.y++;
+            if(tmp.y == Size) {
+                tmp.y = 0;
+                tmp.z++;
             }
         }
-
-        //DebugDrawGrid(Size, root);
     }
 
     [EasyButtons.Button]
     public void TestRemove() {
-        coords.x--;
-        if(coords.x == -1) {
-            coords.x = Size - 1;
-            coords.y--;
-            if(coords.y == -1) {
-                coords.y = Size - 1;
-                coords.z--;
+        tmp.x--;
+        if(tmp.x == -1) {
+            tmp.x = Size - 1;
+            tmp.y--;
+            if(tmp.y == -1) {
+                tmp.y = Size - 1;
+                tmp.z--;
 
-                if(coords.z == -1) {
-                    coords = Vector3Int.zero;
+                if(tmp.z == -1) {
+                    tmp = Vector3Int.zero;
                 }
             }
         }
 
-        ClearValue(coords.x, coords.y, coords.z);
-        //DebugDrawGrid(Size, root);
+        Remove(tmp.x, tmp.y, tmp.z);
     }
 
-    public bool TryGetValue(int x, int y, int z, out Color value) {
-        return TryGetValue(x, y, z, Size, root, debugDraw: false, out value);
-    }
 
-    public void SetValue(int x, int y, int z, Color value) {
-        SetValue(x, y, z, Size, root, value);
-    }
-
-    public void ClearValue(int x, int y, int z) {
-        SetValue(x, y, z, Size, root, null);
-    }
-
-    private static bool TryGetValue(int x, int y, int z, int treeSize, Node root, bool debugDraw, out Color value) {
-        value = Color.clear;
-
-        if(x < 0 || y < 0 || z < 0 || x >= treeSize || y >= treeSize || z >= treeSize) {
+    private Node Get(int x, int y, int z, bool addNewIfNull = false, bool debugDraw = false) {
+        if(x < 0 || y < 0 || z < 0 || x >= Size || y >= Size || z >= Size) {
             Debug.LogWarningFormat("Failed to get : {0}, {1}, {2}", x, y, z);
-            return false;
+            return null;
         }
 
-        Node node = root;
+        Node n = root;
 
-        int nodeSize = treeSize;
-        int childSize = nodeSize / 2;
+        int parentSize = Size;
+        int childSize = Size;
 
-        int nodeOffsetX = 0;
-        int nodeOffsetY = 0;
-        int nodeOffsetZ = 0;
+        int parentOffsetX = 0;
+        int parentOffsetY = 0;
+        int parentOffsetZ = 0;
 
-        if(debugDraw) {
-            if(node.Value.HasValue) {
-                DebugDrawNode(new Vector3Int(nodeOffsetX, nodeOffsetY, nodeOffsetZ), nodeSize, treeSize, node.Value.Value, 0.05f);
-            }
-            else {
-                DebugDrawNode(new Vector3Int(nodeOffsetX, nodeOffsetY, nodeOffsetZ), nodeSize, treeSize, Color.grey, 0.05f);
-            }
-        }
+        while(true) {
+            parentSize = childSize;
+            childSize = parentSize / 2;
 
-        while(!node.Value.HasValue) {
             Vector3Int childLocalPos = new Vector3Int(
-                (int)Mathf.Clamp01(Mathf.Sign(x - (nodeOffsetX + childSize))),
-                (int)Mathf.Clamp01(Mathf.Sign(y - (nodeOffsetY + childSize))),
-                (int)Mathf.Clamp01(Mathf.Sign(z - (nodeOffsetZ + childSize)))
+                (int)Mathf.Clamp01(Mathf.Sign(x - (parentOffsetX + childSize))),
+                (int)Mathf.Clamp01(Mathf.Sign(y - (parentOffsetY + childSize))),
+                (int)Mathf.Clamp01(Mathf.Sign(z - (parentOffsetZ + childSize)))                
             );
 
-            if(node.Children == null) {
-                return false;
+            if(parentSize > 1) {
+                int childSiblingIndex = childLocalPos.x + 2 * (childLocalPos.y + 2 * childLocalPos.z);
+
+                if(n.Children == null) {
+                    if(addNewIfNull) {
+                        n.Children = new Node[8];
+                    }
+                    else {
+                        return null;
+                    }
+                }
+
+                if(n.Children[childSiblingIndex] == null) {
+                    if(addNewIfNull) {
+                        n.Children[childSiblingIndex] = new Node(n, childSiblingIndex);
+                    }
+                    else {
+                        return null;
+                    }
+                }
+
+                n = n.Children[childSiblingIndex];
             }
-
-            int childSiblingIndex = VoxelGrid.CoordsToIndex(childLocalPos, width: 2);
-            node = node.Children[childSiblingIndex];
-
-            nodeOffsetX += childSize * childLocalPos.x;
-            nodeOffsetY += childSize * childLocalPos.y;
-            nodeOffsetZ += childSize * childLocalPos.z;
-
-            nodeSize = childSize;
-            childSize = nodeSize / 2;
 
             if(debugDraw) {
-                if(node.Value.HasValue) {
-                    DebugDrawNode(new Vector3Int(nodeOffsetX, nodeOffsetY, nodeOffsetZ), nodeSize, treeSize, node.Value.Value, 0.05f);
-                }
-                else {
-                    DebugDrawNode(new Vector3Int(nodeOffsetX, nodeOffsetY, nodeOffsetZ), nodeSize, treeSize, Color.grey, 0.05f);
-                }
-            }
-        }
-
-        value = node.Value.Value;
-        return true;
-    }
-
-    private static void SetValue(int x, int y, int z, int treeSize, Node root, Color? value) {
-        if(x < 0 || y < 0 || z < 0 || x >= treeSize || y >= treeSize || z >= treeSize) {
-            Debug.LogWarningFormat("Failed to set : {0}, {1}, {2}", x, y, z);
-            return;
-        }
-
-        if(value == null && !TryGetValue(x, y, z, treeSize, root, debugDraw: false, out Color tmpValue)) {
-            return;
-        }
-
-        Node node = root;
-
-        int nodeSize = treeSize;
-        int childSize = nodeSize / 2;
-
-        int nodeOffsetX = 0;
-        int nodeOffsetY = 0;
-        int nodeOffsetZ = 0;
-
-        while(nodeSize > 1) {
-            if(value == node.Value && value != null) {
-                return;
+                DebugDrawNode(new Vector3Int(parentOffsetX, parentOffsetY, parentOffsetZ), parentSize, Size, 0.01f);
             }
 
-            Vector3Int childLocalPos = new Vector3Int(
-                (int)Mathf.Clamp01(Mathf.Sign(x - (nodeOffsetX + childSize))),
-                (int)Mathf.Clamp01(Mathf.Sign(y - (nodeOffsetY + childSize))),
-                (int)Mathf.Clamp01(Mathf.Sign(z - (nodeOffsetZ + childSize)))
-            );
-
-            int childSiblingIndex = VoxelGrid.CoordsToIndex(childLocalPos, width: 2);
-            if(node.Children == null) {
-                node.SetupChildren();
-
-                if(value != null) {
-                    node.Children[childSiblingIndex].SetValue(null, informParent: false);
-                }
+            if(parentSize == 1) {
+                return n;
             }
 
-            node = node.Children[childSiblingIndex];
-
-            nodeOffsetX += childSize * childLocalPos.x;
-            nodeOffsetY += childSize * childLocalPos.y;
-            nodeOffsetZ += childSize * childLocalPos.z;
-
-            nodeSize = childSize;
-            childSize = nodeSize / 2;
-        }
-
-        if(value == node.Value) {
-            return;
-        }
-
-        node.SetValue(value, informParent: true);
-    }
-
-    private static void DebugDrawGrid(int treeSize, Node root) {
-        for(int z = 0; z < treeSize; z++) {
-            for(int y = 0; y < treeSize; y++) {
-                for(int x = 0; x < treeSize; x++) {
-                    TryGetValue(x, y, z, treeSize, root, debugDraw: true, out Color value);
-                }
-            }
+            parentOffsetX += childSize * childLocalPos.x;
+            parentOffsetY += childSize * childLocalPos.y;
+            parentOffsetZ += childSize * childLocalPos.z;
         }
     }
 
-    private static void DebugDrawNode(Vector3Int nodeOffset, int nodeSize, int gridSize, Color color, float time) {
+    private void Remove(int x, int y, int z) {
+        Node descendant = Get(x, y, z);
+        if(descendant == null) {
+            Debug.LogWarningFormat("Failed to remove : {0}, {1}, {2}", x, y, z);
+            return;
+        }
+
+        Node ancestor = descendant.Parent;
+        
+        while(ancestor != null) {
+            ancestor.Children[descendant.SiblingIndex] = null;
+
+            bool foundAliveRelatives = false;
+            for(int i = 0; i < 8; i++) {
+                if(ancestor.Children[i] != null) {
+                    foundAliveRelatives = true;
+                    break;
+                }
+                else if(i == 8) {
+                    ancestor.Children = null;
+                }
+            }
+
+            if(foundAliveRelatives) {
+                break;
+            }
+
+            descendant = ancestor;
+            ancestor = ancestor.Parent;
+        }
+
+        //Debug.LogFormat("Removed : {0}, {1}, {2}", x, y, z);
+    }
+
+    private void DebugDrawGrid() {
+        for(int z = 0; z < Size; z++) {
+            for(int y = 0; y < Size; y++) {
+                for(int x = 0; x < Size; x++) {
+                    Get(x, y, z, addNewIfNull: false, debugDraw: true);
+                }
+            }
+        }
+
+        //Get(0, 0, 0, addNewIfNull: false, debugDraw: true);
+
+    }
+
+    private void DebugDrawNode(Vector3Int nodeOffset, int nodeSize, int gridSize, float time) {
         Random.seed = nodeOffset.x + gridSize * (nodeOffset.y + gridSize * nodeOffset.z);
+        Color color = new Color(Random.value, Random.value, Random.value, 1f);
 
         float halfSize = nodeSize * 0.5f;
         Vector3 drawPos = nodeOffset + new Vector3(halfSize, halfSize, halfSize);
