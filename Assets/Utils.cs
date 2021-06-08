@@ -10,6 +10,14 @@ public enum Direction { //! WARNING: changing the integers could seriously mess 
     Back = 5
 }
 
+public enum Axis {
+    None,
+    X, 
+    Y, 
+    Z 
+}
+
+
 public delegate void Callback();
 
 public static partial class Utils
@@ -105,5 +113,158 @@ public static partial class Utils
         value |= value >> 8;
         value |= value >> 16;
         return ++value;
+    }
+
+    public static void DebugDrawOctree<T>(this Octree<T> octree, Color color, Color emptyNodeColor, float duration) where T : System.IEquatable<T> {
+        int nodeCount = octree.Dimensions.Sum();
+
+        for(int i = 0; i < nodeCount; i++) {
+            if(!octree.TryGetNode(VoxelGrid.IndexToCoords(i, octree.Dimensions), out Octree<T>.Node node)) {
+                throw new System.Exception();
+            }
+
+            Vector3Int nodeOffset = node.GetOffset(octree.Offset);
+
+            Vector3 drawPos = new Vector3(
+                nodeOffset.x + node.Size / 2f,
+                nodeOffset.y + node.Size / 2f,
+                nodeOffset.z + node.Size / 2f
+            );
+
+            if(node.HasValue()) {
+                DebugDrawCube(drawPos, node.Size * 0.95f, color, duration);
+            }
+            else if(emptyNodeColor.a > 0) {
+                DebugDrawDiamond(drawPos, node.Size * 0.1f, emptyNodeColor, duration);
+            }
+        }
+    }
+
+    public static void DebugDrawCube(Vector3 pos, float size, Color color, float duration) {
+        Vector3 corner_0 = pos + new Vector3(-1, -1, -1) * (size / 2f);
+        Vector3 corner_1 = pos + new Vector3(-1, -1,  1) * (size / 2f);
+        Vector3 corner_2 = pos + new Vector3( 1, -1,  1) * (size / 2f);
+        Vector3 corner_3 = pos + new Vector3( 1, -1, -1) * (size / 2f);
+        Vector3 corner_4 = pos + new Vector3(-1,  1, -1) * (size / 2f);
+        Vector3 corner_5 = pos + new Vector3(-1,  1,  1) * (size / 2f);
+        Vector3 corner_6 = pos + new Vector3( 1,  1,  1) * (size / 2f);
+        Vector3 corner_7 = pos + new Vector3( 1,  1, -1) * (size / 2f);
+
+        Debug.DrawLine(corner_0, corner_1, color, duration);
+        Debug.DrawLine(corner_1, corner_2, color, duration);
+        Debug.DrawLine(corner_2, corner_3, color, duration);
+        Debug.DrawLine(corner_3, corner_0, color, duration);
+
+        Debug.DrawLine(corner_4, corner_5, color, duration);
+        Debug.DrawLine(corner_5, corner_6, color, duration);
+        Debug.DrawLine(corner_6, corner_7, color, duration);
+        Debug.DrawLine(corner_7, corner_4, color, duration);
+
+        Debug.DrawLine(corner_0, corner_4, color, duration);
+        Debug.DrawLine(corner_1, corner_5, color, duration);
+        Debug.DrawLine(corner_2, corner_6, color, duration);
+        Debug.DrawLine(corner_3, corner_7, color, duration);
+    }
+
+    public static void DebugDrawDiamond(Vector3 pos, float size, Color color, float duration) {
+        Vector3 corner_0 = pos + Vector3.left * (size / 2f);
+        Vector3 corner_1 = pos + Vector3.forward * (size / 2f);
+        Vector3 corner_2 = pos + Vector3.right * (size / 2f);
+        Vector3 corner_3 = pos + Vector3.back * (size / 2f);
+        Vector3 corner_4 = pos + Vector3.down * (size / 2f);
+        Vector3 corner_5 = pos + Vector3.up * (size / 2f);
+
+        Debug.DrawLine(corner_0, corner_1, color, duration);
+        Debug.DrawLine(corner_1, corner_2, color, duration);
+        Debug.DrawLine(corner_2, corner_3, color, duration);
+        Debug.DrawLine(corner_3, corner_0, color, duration);
+
+        Debug.DrawLine(corner_4, corner_0, color, duration);
+        Debug.DrawLine(corner_4, corner_1, color, duration);
+        Debug.DrawLine(corner_4, corner_2, color, duration);
+        Debug.DrawLine(corner_4, corner_3, color, duration);
+
+        Debug.DrawLine(corner_5, corner_0, color, duration);
+        Debug.DrawLine(corner_5, corner_1, color, duration);
+        Debug.DrawLine(corner_5, corner_2, color, duration);
+        Debug.DrawLine(corner_5, corner_3, color, duration);
+    }
+
+    public static int Max(this Vector3Int v) {
+        return Mathf.Max(v.x, Mathf.Max(v.y, v.z));
+    }
+
+    public static int Sum(this Vector3Int v) {
+        return v.x * v.y * v.z;
+    }
+
+    public static int Get(this Vector3Int v, Axis axis) {
+        switch(axis) {
+            case Axis.X: { return v.x; }
+            case Axis.Y: { return v.y; }
+            case Axis.Z: { return v.z; }
+        }
+
+        throw new System.NotImplementedException();
+    }
+
+    public static Vector3Int Set(this Vector3Int v, Axis axis, int value) {
+        switch(axis) {
+            case Axis.X: { v.x = value; break; }
+            case Axis.Y: { v.y = value; break; }
+            case Axis.Z: { v.z = value; break; }
+        }
+
+        return v;
+    }
+
+    public static void GetOtherAxes(Axis relativeForward, out Axis relativeHorizontal, out Axis relativeVertical) {
+        relativeHorizontal = Axis.None;
+        relativeVertical = Axis.None;
+        
+        switch(relativeForward) {
+            case Axis.X: {
+                relativeHorizontal = Axis.Z;
+                relativeVertical = Axis.Y;
+                break; 
+            }
+            case Axis.Y: {
+                relativeHorizontal = Axis.X;
+                relativeVertical = Axis.Z;
+                break; 
+            }
+            case Axis.Z: {
+                relativeHorizontal = Axis.X;
+                relativeVertical = Axis.Y;
+                break; 
+            }
+        }
+    }
+
+    public static Axis DirectionToAxis(Direction direction) {
+        switch(direction) {
+            case Direction.None:  return Axis.None;
+            case Direction.Right: return Axis.X;
+            case Direction.Left:  return Axis.X;
+            case Direction.Up:    return Axis.Y;
+            case Direction.Down:  return Axis.Y;
+            case Direction.Fore:  return Axis.Z;
+            case Direction.Back:  return Axis.Z;
+        }
+
+        return Axis.None;
+    }
+
+    public static bool IsPositiveDirection(Direction direction) {
+        switch(direction) {
+            case Direction.Right: return true;
+            case Direction.Left:  return false;
+            case Direction.Up:    return true;
+            case Direction.Down:  return false;
+            case Direction.Fore:  return true;
+            case Direction.Back:  return false;
+        }
+
+        return false;
     }
 }
