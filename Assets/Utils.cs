@@ -78,7 +78,6 @@ public static partial class Utils
 
     public static bool AreDirectionsOpposite(Direction dir1, Direction dir2) {
         switch(dir1) {
-            case Direction.None:    return dir2 == Direction.None;
             case Direction.Right:   return dir2 == Direction.Left;
             case Direction.Left:    return dir2 == Direction.Right;
             case Direction.Up:      return dir2 == Direction.Down;

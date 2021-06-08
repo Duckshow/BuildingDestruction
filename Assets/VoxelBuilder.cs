@@ -18,7 +18,7 @@ public class VoxelBuilder : MonoBehaviour {
     }
 
     public void Refresh() {
-		Vector3Int newDimensions = voxelGrid.GetVoxelGridDimensions();
+		Vector3Int newDimensions = voxelGrid.GetBinGridDimensions();
 
 		if(dimensions == Vector3Int.zero) {
 			dimensions = newDimensions;
@@ -36,7 +36,9 @@ public class VoxelBuilder : MonoBehaviour {
 
 		Mesh[] meshes = new Mesh[newLength];
 		for(int i = 0; i < newLength; i++) {
-			if(VoxelMeshFactory.TryGetMesh(VoxelGrid.IndexToCoords(i, newDimensions), voxelGrid, out meshes[i]) && meshObjects[i] == null) {
+			Bin bin = voxelGrid.GetBin(i);
+
+			if(VoxelMeshFactory.TryGetMesh(bin, out meshes[i]) && meshObjects[i] == null) {
 				meshObjects[i] = Instantiate(meshObjectPrefab, meshTransform).GetComponent<MeshObject>(); // TODO: make a global meshobject pool
 			}
 		}
@@ -66,7 +68,7 @@ public class VoxelBuilder : MonoBehaviour {
             }
 
 			meshObject.transform.name = "MeshObject #" + i;
-			meshObject.transform.localPosition = VoxelGrid.IndexToCoords(i, dimensions);
+			meshObject.transform.localPosition = VoxelGrid.IndexToCoords(i, dimensions) * Bin.WIDTH;
 			meshObject.SetMesh(meshes[i]);
 			meshObject.SetMaterial(material);
 		}
