@@ -27,7 +27,7 @@ public class VoxelController : MonoBehaviour {
 							continue;
                         }
 
-						voxelGrid.TryRemoveVoxel(new Vector3Int(x, y, z));
+						voxelGrid.TrySetVoxelExists(new Vector3Int(x, y, z), exists: false);
 					}
 				}
 			}
@@ -42,7 +42,8 @@ public class VoxelController : MonoBehaviour {
 	}
 
 	private void FireBeam(bool isInstant) {
-		Vector3Int voxelGridDimensions = voxelGrid.GetVoxelGridDimensions();
+		Vector3Int binGridDimensions = voxelGrid.GetBinGridDimensions();
+		Vector3Int voxelGridDimensions = VoxelGrid.CalculateVoxelGridDimensions(binGridDimensions);
 
 		Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 		Vector3Int lineStartCoords = voxelGrid.GetVoxelCoordsFromWorldPos(mouseWorldPos);
@@ -57,7 +58,7 @@ public class VoxelController : MonoBehaviour {
 				continue;
             }
 
-			voxelGrid.TryRemoveVoxel(lineVoxelCoords);
+			voxelGrid.TrySetVoxelExists(lineVoxelCoords, exists: false);
             if(!isInstant) {
 				break;
             }
