@@ -1,8 +1,8 @@
 using NUnit.Framework;
 using UnityEngine;
-using Assert = NUnit.Framework.Assert;
 
-public class VoxelGridTests {
+public class VoxelGridTests
+{
     [Test]
     public void AreCoordsWithinDimensions() {
         for(int i = 0; i < 25; i++) {
@@ -44,28 +44,20 @@ public class VoxelGridTests {
 
     [Test]
     public void GetPivot() {
-        Test(new Vector3Int(0, 0, 0), new Vector3Int(1, 1, 1));
-        Test(new Vector3Int(0, 0, 0), new Vector3Int(2, 4, 6));
-        
-        Test(new Vector3Int(1, 0, 0), new Vector3Int(1, 1, 1));
-        Test(new Vector3Int(0, 1, 0), new Vector3Int(1, 1, 1));
-        Test(new Vector3Int(0, 0, 1), new Vector3Int(1, 1, 1));
-        Test(new Vector3Int(1, 1, 1), new Vector3Int(1, 1, 1));
+        {
+            Vector3Int dimensions = new Vector3Int(8, 8, 8);
+            Octree<bool> voxelMap = new Octree<bool>(Mathf.Max(dimensions.x, Mathf.Max(dimensions.y, dimensions.z)), startValue: true);
 
-        Test(new Vector3Int(4, 5, 6), new Vector3Int(7, 8, 9));
-        Test(new Vector3Int(0, 20, 0), new Vector3Int(10, 1, 10));
+            Assert.AreEqual(new Vector3(3.5f, 3.5f, 3.5f), VoxelGrid.GetPivot(voxelMap, dimensions, isStatic: false));
+            Assert.AreEqual(new Vector3(3.5f, -0.5f, 3.5f), VoxelGrid.GetPivot(voxelMap, dimensions, isStatic: true));
 
-        void Test(Vector3Int offset, Vector3Int dimensions) {
-            int treeSize = Utils.RoundUpToPOT(dimensions.Max());
-            Octree<bool> voxelMap = new Octree<bool>(Vector3Int.zero, new Vector3Int(treeSize, treeSize, treeSize), startValue: true);
-            voxelMap.Resize(offset, dimensions);
+        }
+        {
+            Vector3Int dimensions = new Vector3Int(1, 1, 1);
+            Octree<bool> voxelMap = new Octree<bool>(Mathf.Max(dimensions.x, Mathf.Max(dimensions.y, dimensions.z)), startValue: true);
 
-            float expectedX = (dimensions.x - 1) / 2f;
-            float expectedY = (dimensions.y - 1) / 2f;
-            float expectedZ = (dimensions.z - 1) / 2f;
-
-            Assert.AreEqual(new Vector3(expectedX, expectedY, expectedZ), VoxelGrid.GetPivot(voxelMap, isStatic: false), "Error, using offset {0}, dimensions {1}", offset, dimensions);
-            Assert.AreEqual(new Vector3(expectedX, offset.y - 0.5f, expectedZ), VoxelGrid.GetPivot(voxelMap, isStatic: true), "Error, using offset {0}, dimensions {1}", offset, dimensions);
+            Assert.AreEqual(new Vector3(0f, 0f, 0f), VoxelGrid.GetPivot(voxelMap, dimensions, isStatic: false));
+            Assert.AreEqual(new Vector3(0f, -0.5f, 0f), VoxelGrid.GetPivot(voxelMap, dimensions, isStatic: true));
         }
     }
 }

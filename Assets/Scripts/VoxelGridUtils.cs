@@ -1,28 +1,20 @@
 using UnityEngine;
-using System.Runtime.CompilerServices;
+using System.Collections.Generic;
 
-[assembly: InternalsVisibleTo("EditMode")]
-public partial class VoxelGrid {
-    internal static Vector3 GetPivot(Octree<bool> voxelMap, bool isStatic) {
-        Debug.Assert(voxelMap.Offset.x >= 0);
-        Debug.Assert(voxelMap.Offset.y >= 0);
-        Debug.Assert(voxelMap.Offset.z >= 0);
-
-        Debug.Assert(voxelMap.Dimensions.x >= 0);
-        Debug.Assert(voxelMap.Dimensions.y >= 0);
-        Debug.Assert(voxelMap.Dimensions.z >= 0);
-
+public partial class VoxelGrid
+{
+    public static Vector3 GetPivot(Octree<bool> voxelMap, Vector3Int voxelGridDimensions, bool isStatic) {
         Vector3 pivot = Vector3.zero;
         float divisor = 0f;
 
-        for(int z = 0; z < voxelMap.Dimensions.z; z++) {
-            for(int y = 0; y < voxelMap.Dimensions.y; y++) {
-                for(int x = 0; x < voxelMap.Dimensions.x; x++) {
+        for(int z = 0; z < voxelGridDimensions.z; z++) {
+            for(int y = 0; y < voxelGridDimensions.y; y++) {
+                for(int x = 0; x < voxelGridDimensions.x; x++) {
                     if(isStatic && y > 0) {
                         continue;
                     }
 
-                    if(!voxelMap.TryGetValue(new Vector3Int(x, y, z), out bool doesVoxelExist) || !doesVoxelExist) {
+                    if(!voxelMap.TryGetValue(x, y, z, out bool b, debugDrawCallback: null)) {
                         continue;
                     }
 
@@ -38,18 +30,10 @@ public partial class VoxelGrid {
             return Vector3.zero;
         }
 
+
         pivot /= divisor;
-
-        //pivot.x += voxelMap.Offset.x;
-        //pivot.y += voxelMap.Offset.y;
-        //pivot.z += voxelMap.Offset.z;
-
-        //pivot.x -= 0.5f;
-        //pivot.y -= 0.5f;
-        //pivot.z -= 0.5f;
-
         if(isStatic) {
-            pivot.y = voxelMap.Offset.y - 0.5f;
+            pivot.y = -0.5f;
         }
 
         return pivot;
