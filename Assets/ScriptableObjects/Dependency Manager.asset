@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aad0d06865015dd49bbed7e2aed283e7, type: 3}
+  m_Script: {fileID: 11500000, guid: 9f02e2934ab6fc044a7522e315f9d4ab, type: 3}
   m_Name: Dependency Manager
   m_EditorClassIdentifier: 
   prefabs:

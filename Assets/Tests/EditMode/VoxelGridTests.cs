@@ -1,71 +1,57 @@
 using NUnit.Framework;
 using UnityEngine;
+using System.Collections.Generic;
 using Assert = NUnit.Framework.Assert;
 
 public class VoxelGridTests {
-    [Test]
-    public void AreCoordsWithinDimensions() {
-        for(int i = 0; i < 25; i++) {
-            Vector3Int dimensions = new Vector3Int(Random.Range(1, 10), Random.Range(1, 10), Random.Range(1, 10));
-            Vector3Int coords = new Vector3Int(Random.Range(0, dimensions.x), Random.Range(0, dimensions.y), Random.Range(0, dimensions.z));
-
-            Assert.IsTrue(VoxelGrid.AreCoordsWithinDimensions(coords, dimensions));
-            Assert.IsFalse(VoxelGrid.AreCoordsWithinDimensions(dimensions, dimensions));
-        }
-    }
-
-    [Test]
-    public void CoordsToIndexAndViceVersa() {
-        for(int i = 0; i < 25; i++) {
-            Vector3Int dimensions = new Vector3Int(Random.Range(1, 10), Random.Range(1, 10), Random.Range(1, 10));
-
-            int expectedIndex = 0;
-
-            for(int z = 0; z < dimensions.z; z++) {
-                for(int y = 0; y < dimensions.y; y++) {
-                    for(int x = 0; x < dimensions.x; x++) {
-                        Vector3Int expectedCoords = new Vector3Int(x, y, z);
-
-                        Assert.AreEqual(expectedIndex, VoxelGrid.CoordsToIndex(expectedCoords, dimensions));
-                        Assert.AreEqual(expectedCoords, VoxelGrid.IndexToCoords(expectedIndex, dimensions));
-
-                        expectedIndex++;
-                    }
-                }
-            }
-
-            Assert.AreEqual(-1, VoxelGrid.CoordsToIndex(dimensions, dimensions));
-            Assert.AreEqual(-1, VoxelGrid.CoordsToIndex(new Vector3Int(0, 0, -1), dimensions));
-
-            Assert.AreEqual(-Vector3Int.one, VoxelGrid.IndexToCoords(-1, dimensions));
-            Assert.AreEqual(-Vector3Int.one, VoxelGrid.IndexToCoords(dimensions.x * dimensions.y * dimensions.z, dimensions));
-        }
-    }
 
     [Test]
     public void GetPivot() {
-        Test(new Vector3Int(0, 0, 0), new Vector3Int(1, 1, 1));
-        Test(new Vector3Int(0, 0, 0), new Vector3Int(2, 4, 6));
-        
-        Test(new Vector3Int(1, 0, 0), new Vector3Int(1, 1, 1));
-        Test(new Vector3Int(0, 1, 0), new Vector3Int(1, 1, 1));
-        Test(new Vector3Int(0, 0, 1), new Vector3Int(1, 1, 1));
-        Test(new Vector3Int(1, 1, 1), new Vector3Int(1, 1, 1));
+        Test(new Vector3Int(1, 1, 1));
+        Test(new Vector3Int(2, 4, 6));
 
-        Test(new Vector3Int(4, 5, 6), new Vector3Int(7, 8, 9));
-        Test(new Vector3Int(0, 20, 0), new Vector3Int(10, 1, 10));
+        Test(new Vector3Int(1, 1, 1));
+        Test(new Vector3Int(1, 1, 1));
+        Test(new Vector3Int(1, 1, 1));
+        Test(new Vector3Int(1, 1, 1));
 
-        void Test(Vector3Int offset, Vector3Int dimensions) {
-            int treeSize = Utils.RoundUpToPOT(dimensions.Max());
-            Octree<bool> voxelMap = new Octree<bool>(Vector3Int.zero, new Vector3Int(treeSize, treeSize, treeSize), startValue: true);
-            voxelMap.Resize(offset, dimensions);
+        Test(new Vector3Int(7, 8, 9));
+        Test(new Vector3Int(10, 1, 10));
 
-            float expectedX = (dimensions.x - 1) / 2f;
-            float expectedY = (dimensions.y - 1) / 2f;
-            float expectedZ = (dimensions.z - 1) / 2f;
+        void Test(Vector3Int dimensions) {
+            VoxelCluster voxelCluster = new VoxelCluster(dimensions, voxelBlockStartValue: byte.MaxValue);
 
-            Assert.AreEqual(new Vector3(expectedX, expectedY, expectedZ), VoxelGrid.GetPivot(voxelMap, isStatic: false), "Error, using offset {0}, dimensions {1}", offset, dimensions);
-            Assert.AreEqual(new Vector3(expectedX, offset.y - 0.5f, expectedZ), VoxelGrid.GetPivot(voxelMap, isStatic: true), "Error, using offset {0}, dimensions {1}", offset, dimensions);
+            float expectedX = dimensions.x; // NOTE: remember that one voxelblock is 2 voxels/units wide
+            float expectedY = dimensions.y;
+            float expectedZ = dimensions.z;
+
+            Assert.AreEqual(new Vector3(expectedX, expectedY, expectedZ), VoxelGrid.GetPivot(voxelCluster, isStatic: false), "Error, using dimensions {0}", dimensions);
+            Assert.AreEqual(new Vector3(expectedX, 0f, expectedZ), VoxelGrid.GetPivot(voxelCluster, isStatic: true), "Error, using dimensions {0}", dimensions);
+        }
+    }
+
+    [Test]
+    public void TestGetBiggestVoxelClusterIndex() {
+        for(int i = 0; i < 10; i++) {
+            int biggest = 10;
+
+            List<VoxelCluster> list = new List<VoxelCluster>() {
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest))),
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest))),
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest))),
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest))),
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest))),
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest))),
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest))),
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest))),
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest))),
+                new VoxelCluster(new Vector3Int(Random.Range(1, biggest), Random.Range(0, biggest), Random.Range(1, biggest)))
+            };
+
+            int biggestIndex = Random.Range(0, list.Count);
+            list.Insert(biggestIndex, new VoxelCluster(new Vector3Int(biggest, biggest, biggest)));
+
+            Assert.AreEqual(biggestIndex, VoxelGrid.GetBiggestVoxelClusterIndex(list));
         }
     }
 }

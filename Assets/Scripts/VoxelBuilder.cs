@@ -1,24 +1,24 @@
 using UnityEngine;
 using System.Collections;
 
-[RequireComponent(typeof(VoxelGrid))]
-public class VoxelBuilder : MonoBehaviour {
-
-	[SerializeField] private GameObject meshObjectPrefab; // TODO: handle dependencies better
-	[SerializeField] private Material material;
-	[SerializeField] private Transform meshTransform;
+public class VoxelBuilder {
 
 	[SerializeField, HideInInspector] private Vector3Int dimensions;
-	private MeshObject[] meshObjects;
-	
-	private VoxelGrid voxelGrid;
 
-    private void Awake() {
-		voxelGrid = GetComponent<VoxelGrid>();
-    }
+	private VoxelGrid owner;
+	private GameObject meshObjectPrefab;
+	private Material material;
+	private MeshObject[] meshObjects;
+
+    public VoxelBuilder(VoxelGrid owner) {
+		this.owner = owner;
+
+		meshObjectPrefab = DependencyManager.Instance.Prefabs.MeshObject;
+		material = DependencyManager.Instance.Materials.Voxel;
+	}
 
     public void Refresh() {
-		Vector3Int newDimensions = voxelGrid.GetBinGridDimensions();
+		Vector3Int newDimensions = owner.GetVoxelCluster().Dimensions;
 
 		if(dimensions == Vector3Int.zero) {
 			dimensions = newDimensions;
@@ -36,20 +36,22 @@ public class VoxelBuilder : MonoBehaviour {
 
 		Mesh[] meshes = new Mesh[newLength];
 		for(int i = 0; i < newLength; i++) {
-			Bin bin = voxelGrid.GetBin(i);
+            if(!owner.GetVoxelCluster().TryGetVoxelBlock(i, out Bin voxelBlock)) {
+				continue;
+            }
 
-			if(VoxelMeshFactory.TryGetMesh(bin, out meshes[i]) && meshObjects[i] == null) {
-				meshObjects[i] = Instantiate(meshObjectPrefab, meshTransform).GetComponent<MeshObject>(); // TODO: make a global meshobject pool
+			if(VoxelMeshFactory.TryGetMesh(voxelBlock, out meshes[i]) && meshObjects[i] == null) {
+				meshObjects[i] = Object.Instantiate(meshObjectPrefab, owner.GetMeshTransform()).GetComponent<MeshObject>(); // TODO: make a global meshobject pool
 			}
 		}
 
 		for(int i = newLength; i < meshObjects.Length; i++) {
             if(meshObjects[i] != null) {
-				Destroy(meshObjects[i].gameObject);
+				Object.Destroy(meshObjects[i].gameObject);
 			}
 		}
 
- 		StartCoroutine(WaitThenFinishRefresh(meshes, meshObjects, newLength, dimensions, material));
+ 		owner.StartCoroutine(WaitThenFinishRefresh(meshes, meshObjects, newLength, dimensions, material));
 	}
 
 	private static IEnumerator WaitThenFinishRefresh(Mesh[] meshes, MeshObject[] meshObjects, int newMeshObjectCount, Vector3Int dimensions, Material material) {
@@ -63,12 +65,12 @@ public class VoxelBuilder : MonoBehaviour {
 
 			Mesh mesh = meshes[i];
             if(mesh == null) {
-				Destroy(meshObjects[i].gameObject);
+				Object.Destroy(meshObjects[i].gameObject);
 				continue;
             }
 
 			meshObject.transform.name = "MeshObject #" + i;
-			meshObject.transform.localPosition = VoxelGrid.IndexToCoords(i, dimensions) * Bin.WIDTH;
+			meshObject.transform.localPosition = Utils.IndexToCoords(i, dimensions) * Bin.WIDTH + new Vector3(0.5f, 0.5f, 0.5f);
 			meshObject.SetMesh(meshes[i]);
 			meshObject.SetMaterial(material);
 		}

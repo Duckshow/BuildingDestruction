@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(VoxelGrid))]
@@ -13,12 +12,12 @@ public class VoxelController : MonoBehaviour {
 		if(voxelGrid == null) {
 			return;
 		}
-        if(voxelGrid.State != VoxelGrid.UpdateState.UpToDate) {
+        if(voxelGrid.GetVoxelCluster().State == VoxelCluster.UpdateState.WaitingForUpdate) {
 			return;
         }
 
         if(Input.GetKeyDown(KeyCode.Space)) {
-			Vector3Int voxelGridDimensions = voxelGrid.GetVoxelGridDimensions();
+			Vector3Int voxelGridDimensions = voxelGrid.GetVoxelCluster().VoxelDimensions;
 
             for(int z = 0; z < voxelGridDimensions.z; z++) {
                 for(int y = 0; y < voxelGridDimensions.y; y++) {
@@ -27,7 +26,7 @@ public class VoxelController : MonoBehaviour {
 							continue;
                         }
 
-						voxelGrid.TrySetVoxelExists(new Vector3Int(x, y, z), exists: false);
+						voxelGrid.GetVoxelCluster().RemoveVoxel(new Vector3Int(x, y, z));
 					}
 				}
 			}
@@ -42,9 +41,6 @@ public class VoxelController : MonoBehaviour {
 	}
 
 	private void FireBeam(bool isInstant) {
-		Vector3Int binGridDimensions = voxelGrid.GetBinGridDimensions();
-		Vector3Int voxelGridDimensions = VoxelGrid.CalculateVoxelGridDimensions(binGridDimensions);
-
 		Vector3 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 		Vector3Int lineStartCoords = voxelGrid.GetVoxelCoordsFromWorldPos(mouseWorldPos);
 		Vector3Int lineEndCoords = voxelGrid.GetVoxelCoordsFromWorldPos(mouseWorldPos + Camera.main.transform.forward * 100);
@@ -54,11 +50,11 @@ public class VoxelController : MonoBehaviour {
 		for(int i = 0; i < line.Length; i++) {
 			Vector3Int lineVoxelCoords = line[i];
             
-			if(!VoxelGrid.AreCoordsWithinDimensions(lineVoxelCoords, voxelGridDimensions)) {
+			if(!Utils.AreCoordsWithinDimensions(lineVoxelCoords, voxelGrid.GetVoxelCluster().VoxelDimensions)) {
 				continue;
             }
 
-			voxelGrid.TrySetVoxelExists(lineVoxelCoords, exists: false);
+			voxelGrid.GetVoxelCluster().RemoveVoxel(lineVoxelCoords);
             if(!isInstant) {
 				break;
             }

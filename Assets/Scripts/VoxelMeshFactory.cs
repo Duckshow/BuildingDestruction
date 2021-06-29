@@ -79,7 +79,7 @@ public static class VoxelMeshFactory {
         }
     }
 
-    private static Dictionary<ulong, Mesh> cachedMeshes = new Dictionary<ulong, Mesh>();
+    private static Dictionary<uint, Mesh> cachedMeshes = new Dictionary<uint, Mesh>();
 
     public static bool TryGetMesh(Bin bin, out Mesh mesh) {
         if(bin.IsWholeBinEmpty()) {
@@ -87,7 +87,7 @@ public static class VoxelMeshFactory {
             return false;
         }
 
-        ulong id = Bin.GetVisualID(bin);
+        uint id = Bin.GetVisualID(bin);
 
         if(ShouldUseCachedMesh(id)) {
             mesh = cachedMeshes[id];
@@ -100,7 +100,7 @@ public static class VoxelMeshFactory {
         return mesh != null;
     }
 
-    private static bool ShouldUseCachedMesh(ulong id) {
+    private static bool ShouldUseCachedMesh(uint id) {
         return cachedMeshes.ContainsKey(id);
     }
 
@@ -232,10 +232,9 @@ public static class VoxelMeshFactory {
     }
 
     private static void TestGetMesh() {
-        Bin bin = new Bin(0, Vector3Int.one);
-        bin = Bin.SetBinAllVoxelsExists(bin, true);
+        Bin bin = new Bin(0, Vector3Int.one, voxels: byte.MaxValue);
 
-        ulong id = Bin.GetVisualID(bin);
+        uint id = Bin.GetVisualID(bin);
 
         cachedMeshes.Clear();
 
