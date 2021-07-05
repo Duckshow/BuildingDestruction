@@ -25,6 +25,7 @@ public enum Axis {
 
 public delegate void Callback();
 public delegate void Callback<T>(T obj);
+public delegate void Callback<T, U>(out T obj1, out U obj2);
 
 public static partial class Utils
 {

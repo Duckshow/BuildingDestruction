@@ -3,17 +3,16 @@ using System.Runtime.CompilerServices;
 using System.Collections.Generic;
 
 [assembly: InternalsVisibleTo("PlayMode")]
-public class VoxelCluster : IVoxelClusterUpdaterUser {
-
-	public enum UpdateState { Clean, Dirty, WaitingForUpdate }
-	public UpdateState State { get; private set; }
+public class VoxelCluster : IVoxelCluster {
 
 	public Vector3Int VoxelOffset { get; private set; }
 	public Vector3Int Dimensions { get; private set; }
 	public Vector3Int VoxelDimensions { get { return Dimensions * Bin.WIDTH; } }
 
 	private Bin[] voxelBlocks;
+	private Queue<int> voxelsToBeRemoved = new Queue<int>();
 	private Callback<List<VoxelCluster>> onFinishedUpdate;
+	private bool isWaitingForUpdate;
 
 	public VoxelCluster Clone() {
 		VoxelCluster clone = (VoxelCluster)MemberwiseClone();
@@ -56,19 +55,35 @@ public class VoxelCluster : IVoxelClusterUpdaterUser {
 		Dimensions = dimensions;
 	}
 
-	public void OnReceivedUpdateRequest() {
-		State = UpdateState.Dirty;
+	public void RemoveVoxel(Vector3Int voxelCoords) {
+		RemoveVoxel(Utils.CoordsToIndex(voxelCoords, VoxelDimensions));
 	}
 
-	public Bin[] OnUpdateStart() {
-		State = UpdateState.WaitingForUpdate;
-		return voxelBlocks;
+	public void RemoveVoxel(int voxelIndex) {
+		voxelsToBeRemoved.Enqueue(voxelIndex);
+
+		if(voxelsToBeRemoved.Count == 1) {
+			VoxelClusterUpdater.Instance.ScheduleUpdate(this);
+		}
+	}
+
+	public void OnUpdateStart(out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) {
+		isWaitingForUpdate = true;
+		voxelBlocks = this.voxelBlocks;
+		voxelsToRemove = voxelsToBeRemoved;
+	}
+
+	public bool IsDirty() { 
+		return voxelsToBeRemoved.Count > 0;
+	}
+
+	public bool IsWaitingForUpdate() {
+		return isWaitingForUpdate;
 	}
 
 	public void OnUpdateFinish(List<VoxelCluster> newClusters) {
-		State = UpdateState.Clean;
-
-        if(onFinishedUpdate != null) {
+		isWaitingForUpdate = false;
+		if(onFinishedUpdate != null) {
 			onFinishedUpdate(newClusters);
         }
 	}
@@ -96,8 +111,8 @@ public class VoxelCluster : IVoxelClusterUpdaterUser {
 	}
 
 	public bool TryGetVoxelBlock(int index, out Bin voxelBlock) {
-		if(State == UpdateState.Dirty || State == UpdateState.WaitingForUpdate) {
-			Debug.LogError("Tried to get VoxelBlock, but CommandHandler requires updating!");
+		if(IsDirty() || isWaitingForUpdate) {
+			Debug.LogError("Tried to get VoxelBlock, but is currently awaiting update!");
 			voxelBlock = new Bin();
 			return false;
 		}
@@ -126,14 +141,6 @@ public class VoxelCluster : IVoxelClusterUpdaterUser {
 
         return voxelBlock.GetVoxelExists(localVoxelIndex);
     }
-
-	public void RemoveVoxel(Vector3Int voxelCoords) {
-		RemoveVoxel(Utils.CoordsToIndex(voxelCoords, VoxelDimensions));
-	}
-
-	public void RemoveVoxel(int voxelIndex) {
-		VoxelClusterUpdater.ScheduleRemoveVoxel(this, voxelIndex);
-	}
 
 	public bool ShouldBeStatic(bool wasOriginallyStatic) {
 		return wasOriginallyStatic && VoxelOffset.y == 0;

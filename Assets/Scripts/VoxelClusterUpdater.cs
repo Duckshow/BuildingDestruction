@@ -4,61 +4,43 @@ using UnityEngine;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("PlayMode")]
-public static class VoxelClusterUpdater {
+public class VoxelClusterUpdater : Singleton<VoxelClusterUpdater> {
 
-    private static Dictionary<IVoxelClusterUpdaterUser, Queue<int>> voxelsToRemove = new Dictionary<IVoxelClusterUpdaterUser, Queue<int>>();
+    private const float UPDATE_LATENCY = 0.1f;
 
-    // NOTE: repeated connecting to StaticUpdateHandler is because we can't ensure that the gameobject hasn't been destroyed,
-    // which would sever the connection - this way the singleton-call will re-instantiate it should that be the case
-    private static bool isConnectedToUpdateHandler;
+    private Queue<IVoxelCluster> dirtyClusters = new Queue<IVoxelCluster>();
+    private float timer;
 
-    public static void ScheduleRemoveVoxel(IVoxelClusterUpdaterUser user, int voxelIndex) {
-        TryConnectToStaticUpdateHandler();
+    private void Start() {
+        timer = UPDATE_LATENCY;
+    }
 
-        user.OnReceivedUpdateRequest();
-
-        Queue<int> updateQueue;
-        if(voxelsToRemove.TryGetValue(user, out updateQueue)) {
-            updateQueue.Enqueue(voxelIndex);
-            voxelsToRemove[user] = updateQueue;
+    private void LateUpdate() {
+        timer -= Time.deltaTime;
+        if(timer > 0f) {
             return;
         }
+        timer = UPDATE_LATENCY;
 
-        updateQueue = new Queue<int>();
-        updateQueue.Enqueue(voxelIndex);
-        voxelsToRemove.Add(user, updateQueue);
-    }
+        foreach(var cluster in dirtyClusters) { // TODO: could probably multithread this
+            if(!cluster.IsDirty()) {
+                continue;
+            }
 
-    private static void LateUpdate() {
-        foreach(var pair in voxelsToRemove) {
-            StaticUpdateHandler.Instance.StartCoroutine(RemoveVoxelsInCluster(pair.Key, pair.Value, stepDuration: 0f));
+            StartCoroutine(RemoveVoxelsInCluster(cluster, stepDuration: 0f));
         }
-
-        TryDisconnectFromStaticUpdateHandler();
     }
 
-    private static void TryConnectToStaticUpdateHandler() {
-        if(isConnectedToUpdateHandler) {
-            return;
-        }
-
-        StaticUpdateHandler.Instance.Subscribe_LateUpdate(LateUpdate);
-        isConnectedToUpdateHandler = true;
+    public void ScheduleUpdate(IVoxelCluster cluster) {
+        dirtyClusters.Enqueue(cluster);
     }
 
-    private static void TryDisconnectFromStaticUpdateHandler() {
-        if(!isConnectedToUpdateHandler) {
-            return;
-        }
+    internal static IEnumerator RemoveVoxelsInCluster(IVoxelCluster cluster, float stepDuration) {
+        cluster.OnUpdateStart(out Bin[] voxelBlocks, out Queue<int> voxelsToRemove);
 
-        StaticUpdateHandler.Instance.Unsubscribe_LateUpdate(LateUpdate);
-        isConnectedToUpdateHandler = false;
-    }
+        Debug.Assert(voxelsToRemove.Count > 0);
 
-    internal static IEnumerator RemoveVoxelsInCluster(IVoxelClusterUpdaterUser user, Queue<int> voxelsToRemove, float stepDuration) {
-        Bin[] voxelBlocks = user.OnUpdateStart();
-        Vector3Int dimensions = user.GetDimensions();
-
+        Vector3Int dimensions = cluster.GetDimensions();
         Queue<int> generateInteriorsQueue = voxelsToRemove;
 		Queue<int> deleteExteriorsQueue = new Queue<int>(voxelsToRemove.Count);
 		Queue<int> refreshConnectivityQueue = new Queue<int>(voxelsToRemove.Count * 6 * 5); // 6 * 5 is a guesstimate of how many neighbors are affected when we get neighbors as well as their neighbors
@@ -141,8 +123,8 @@ public static class VoxelClusterUpdater {
         }
 
         // 4. find clusters
-        yield return VoxelClusterFloodFillHandler.FindVoxelClusters(voxelBlocks, user.GetOffset(), dimensions, findClustersStartingPointQueue, stepDuration, onFinished: (List<VoxelCluster> foundClusters) => {
-            user.OnUpdateFinish(foundClusters); 
+        yield return VoxelClusterFloodFillHandler.FindVoxelClusters(voxelBlocks, cluster.GetOffset(), dimensions, findClustersStartingPointQueue, stepDuration, onFinished: (List<VoxelCluster> foundClusters) => {
+            cluster.OnUpdateFinish(foundClusters);
         });
     }
 }

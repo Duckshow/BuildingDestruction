@@ -12,7 +12,7 @@ public class VoxelController : MonoBehaviour {
 		if(voxelGrid == null) {
 			return;
 		}
-        if(voxelGrid.GetVoxelCluster().State == VoxelCluster.UpdateState.WaitingForUpdate) {
+        if(voxelGrid.GetVoxelCluster().IsWaitingForUpdate()) {
 			return;
         }
 

@@ -44,6 +44,8 @@ public static class VoxelClusterFloodFillHandler {
 #endif
 
     public static IEnumerator FindVoxelClusters(Bin[] voxelBlocks, Vector3Int offset, Vector3Int dimensions, Queue<int> voxelBlocksToLookAt, float stepDuration, Callback<List<VoxelCluster>> onFinished) {
+        Debug.Assert(voxelBlocksToLookAt.Count > 0);
+        
         bool[] visitedVoxelBlocks = new bool[voxelBlocks.Length];
 
 #if UNITY_EDITOR
@@ -163,6 +165,10 @@ public static class VoxelClusterFloodFillHandler {
             yield return FindExteriorBlocksAroundCluster(newVoxelBlocks, newVoxelOffset, newDimensions, stepDuration);
 
             clusters.Add(new VoxelCluster(newVoxelBlocks, newVoxelOffset, newDimensions));
+        }
+
+        if(clusters.Count == 0) {
+            throw new Exception("Failed to find a single cluster!");
         }
 
         if(onFinished != null) {

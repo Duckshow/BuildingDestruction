@@ -20,7 +20,7 @@ public class VoxelClusterIntegrationTests {
 
         Vector3Int dimensions = new Vector3Int(WIDTH, HEIGHT, DEPTH);
         Bin CreateBin(int index) { return new Bin(index, dimensions, byte.MaxValue); }
-        Bin[] voxelBlocks = new Bin[WIDTH * HEIGHT * DEPTH] {
+        Bin[] originalVoxelBlocks = new Bin[WIDTH * HEIGHT * DEPTH] {
 
             // =========== z == 0 ===========
 
@@ -97,17 +97,19 @@ public class VoxelClusterIntegrationTests {
           //Utils.GetVoxelIndex(20, 7, dimensions),
         };
 
-        FauxVoxelClusterUpdaterUser user = new FauxVoxelClusterUpdaterUser(Vector3Int.zero, new Vector3Int(WIDTH, HEIGHT, DEPTH),
-            onReceivedUpdateRequest: () => { },
-            onUpdateStart: () => { return voxelBlocks; },
+        FauxVoxelCluster user = new FauxVoxelCluster(Vector3Int.zero, new Vector3Int(WIDTH, HEIGHT, DEPTH),
+            onUpdateStart: (out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) => { 
+                voxelBlocks = originalVoxelBlocks; 
+                voxelsToRemove = voxelsToDelete.ToQueue(); 
+            },
             onUpdateFinish: ValidateResults
         );
 
-        for(int i = 0; i < voxelBlocks.Length; i++) {
-            voxelBlocks[i] = Bin.RefreshConnectivity(voxelBlocks, i, dimensions);
+        for(int i = 0; i < originalVoxelBlocks.Length; i++) {
+            originalVoxelBlocks[i] = Bin.RefreshConnectivity(originalVoxelBlocks, i, dimensions);
         }
 
-        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, voxelsToDelete.ToQueue(), STEP_DURATION);
+        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, STEP_DURATION);
 
         void ValidateResults(List<VoxelCluster> foundClusters) {
             Assert.AreEqual(1, foundClusters.Count);
@@ -128,13 +130,13 @@ public class VoxelClusterIntegrationTests {
         const int HEIGHT = 3;
         const int DEPTH = 2;
 
-        FauxVoxelClusterUpdaterUser user;
+        FauxVoxelCluster user;
         VoxelCluster mainCluster = null;
 
         VoxelCluster originalCluster = new VoxelCluster(new Vector3Int(WIDTH, HEIGHT, DEPTH), voxelBlockStartValue: byte.MaxValue);
         Vector3Int dimensions = new Vector3Int(WIDTH, HEIGHT, DEPTH);
         Bin CreateBin(int index) { return new Bin(index, dimensions, byte.MaxValue); }
-        Bin[] voxelBlocks = new Bin[WIDTH * HEIGHT * DEPTH] {
+        Bin[] originalVoxelBlocks = new Bin[WIDTH * HEIGHT * DEPTH] {
 
             // =========== z == 0 ===========
 
@@ -240,19 +242,21 @@ public class VoxelClusterIntegrationTests {
 
         // ========== First split ==========
 
-        user = new FauxVoxelClusterUpdaterUser(
+        user = new FauxVoxelCluster(
             offset: Vector3Int.zero, 
             dimensions: new Vector3Int(WIDTH, HEIGHT, DEPTH),
-            onReceivedUpdateRequest: () => { },
-            onUpdateStart: () => { return voxelBlocks; },
+            onUpdateStart: (out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) => {
+                voxelBlocks = originalVoxelBlocks;
+                voxelsToRemove = firstVoxelsToDelete.ToQueue();
+            },
             onUpdateFinish: ValidateFirstSplitResults
         );
 
-        for(int i = 0; i < voxelBlocks.Length; i++) {
-            voxelBlocks[i] = Bin.RefreshConnectivity(voxelBlocks, i, dimensions);
+        for(int i = 0; i < originalVoxelBlocks.Length; i++) {
+            originalVoxelBlocks[i] = Bin.RefreshConnectivity(originalVoxelBlocks, i, dimensions);
         }
 
-        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, firstVoxelsToDelete.ToQueue(), STEP_DURATION);
+        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, STEP_DURATION);
 
         void ValidateFirstSplitResults(List<VoxelCluster> foundClusters) {
             Assert.AreEqual(2, foundClusters.Count);
@@ -284,19 +288,21 @@ public class VoxelClusterIntegrationTests {
 
         Assert.IsNotNull(mainCluster);
 
-        user = new FauxVoxelClusterUpdaterUser(
+        user = new FauxVoxelCluster(
             offset: mainCluster.VoxelOffset, 
             dimensions: mainCluster.Dimensions,
-            onReceivedUpdateRequest: () => { },
-            onUpdateStart: () => { return GetClusterVoxelBlocksAsArray(mainCluster); },
+            onUpdateStart: (out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) => { 
+                voxelBlocks = GetClusterVoxelBlocksAsArray(mainCluster);
+                voxelsToRemove = secondVoxelsToDelete.ToQueue();
+            },
             onUpdateFinish: ValidateSecondSplitResults
         );
 
-        for(int i = 0; i < voxelBlocks.Length; i++) {
-            voxelBlocks[i] = Bin.RefreshConnectivity(voxelBlocks, i, dimensions);
+        for(int i = 0; i < originalVoxelBlocks.Length; i++) {
+            originalVoxelBlocks[i] = Bin.RefreshConnectivity(originalVoxelBlocks, i, dimensions);
         }
 
-        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, secondVoxelsToDelete.ToQueue(), STEP_DURATION);
+        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, STEP_DURATION);
 
         void ValidateSecondSplitResults(List<VoxelCluster> foundClusters) {
             Assert.AreEqual(2, foundClusters.Count);
@@ -330,13 +336,13 @@ public class VoxelClusterIntegrationTests {
         const int HEIGHT = 3;
         const int DEPTH = 2;
 
-        FauxVoxelClusterUpdaterUser user;
+        FauxVoxelCluster user;
         VoxelCluster clusterToSplitAgain = null;
 
         VoxelCluster originalCluster = new VoxelCluster(new Vector3Int(WIDTH, HEIGHT, DEPTH), voxelBlockStartValue: byte.MaxValue);
         Vector3Int dimensions = new Vector3Int(WIDTH, HEIGHT, DEPTH);
         Bin CreateBin(int index) { return new Bin(index, dimensions, byte.MaxValue); }
-        Bin[] voxelBlocks = new Bin[WIDTH * HEIGHT * DEPTH] {
+        Bin[] originalVoxelBlocks = new Bin[WIDTH * HEIGHT * DEPTH] {
 
             // =========== z == 0 ===========
             
@@ -422,19 +428,21 @@ public class VoxelClusterIntegrationTests {
 
         // ========== First split ==========
 
-        user = new FauxVoxelClusterUpdaterUser(
+        user = new FauxVoxelCluster(
             offset: Vector3Int.zero, 
             dimensions: new Vector3Int(WIDTH, HEIGHT, DEPTH),
-            onReceivedUpdateRequest: () => { },
-            onUpdateStart: () => { return voxelBlocks; },
+            onUpdateStart: (out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) => {
+                voxelBlocks = originalVoxelBlocks;
+                voxelsToRemove = firstVoxelsToDelete.ToQueue();
+            },
             onUpdateFinish: ValidateFirstSplitResults
         );
 
-        for(int i = 0; i < voxelBlocks.Length; i++) {
-            voxelBlocks[i] = Bin.RefreshConnectivity(voxelBlocks, i, dimensions);
+        for(int i = 0; i < originalVoxelBlocks.Length; i++) {
+            originalVoxelBlocks[i] = Bin.RefreshConnectivity(originalVoxelBlocks, i, dimensions);
         }
 
-        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, firstVoxelsToDelete.ToQueue(), STEP_DURATION);
+        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, STEP_DURATION);
 
         void ValidateFirstSplitResults(List<VoxelCluster> foundClusters) {
             Assert.AreEqual(1, foundClusters.Count);
@@ -454,19 +462,21 @@ public class VoxelClusterIntegrationTests {
 
         // ========== Second split ==========
 
-        user = new FauxVoxelClusterUpdaterUser(
+        user = new FauxVoxelCluster(
             offset: clusterToSplitAgain.VoxelOffset, 
             dimensions: clusterToSplitAgain.Dimensions,
-            onReceivedUpdateRequest: () => { },
-            onUpdateStart: () => { return GetClusterVoxelBlocksAsArray(clusterToSplitAgain); },
+            onUpdateStart: (out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) => { 
+                voxelBlocks = GetClusterVoxelBlocksAsArray(clusterToSplitAgain);
+                voxelsToRemove = secondVoxelsToDelete.ToQueue();
+            },
             onUpdateFinish: ValidateSecondSplitResults
         );
 
-        for(int i = 0; i < voxelBlocks.Length; i++) {
-            voxelBlocks[i] = Bin.RefreshConnectivity(voxelBlocks, i, dimensions);
+        for(int i = 0; i < originalVoxelBlocks.Length; i++) {
+            originalVoxelBlocks[i] = Bin.RefreshConnectivity(originalVoxelBlocks, i, dimensions);
         }
 
-        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, secondVoxelsToDelete.ToQueue(), STEP_DURATION);
+        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, STEP_DURATION);
 
         void ValidateSecondSplitResults(List<VoxelCluster> foundClusters) {
             Assert.AreEqual(2, foundClusters.Count);
@@ -499,12 +509,12 @@ public class VoxelClusterIntegrationTests {
         const int HEIGHT = 6;
         const int DEPTH = 7;
 
-        FauxVoxelClusterUpdaterUser user;
+        FauxVoxelCluster user;
 
         VoxelCluster originalCluster = new VoxelCluster(new Vector3Int(WIDTH, HEIGHT, DEPTH), voxelBlockStartValue: byte.MaxValue);
         Vector3Int dimensions = new Vector3Int(WIDTH, HEIGHT, DEPTH);
         Bin CreateBin(int index) { return new Bin(index, dimensions, byte.MaxValue); }
-        Bin[] voxelBlocks = new Bin[WIDTH * HEIGHT * DEPTH] {
+        Bin[] originalVoxelBlocks = new Bin[WIDTH * HEIGHT * DEPTH] {
 
             // =========== z == 0 ===========
             
@@ -650,19 +660,21 @@ public class VoxelClusterIntegrationTests {
           //Utils.GetVoxelIndex(192, 7, dimensions),
         };
 
-        user = new FauxVoxelClusterUpdaterUser(
+        user = new FauxVoxelCluster(
             offset: Vector3Int.zero,
             dimensions: new Vector3Int(WIDTH, HEIGHT, DEPTH),
-            onReceivedUpdateRequest: () => { },
-            onUpdateStart: () => { return voxelBlocks; },
+            onUpdateStart: (out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) => {
+                voxelBlocks = originalVoxelBlocks;
+                voxelsToRemove = voxelsToDelete.ToQueue();
+            },
             onUpdateFinish: ValidateResults
         );
 
-        for(int i = 0; i < voxelBlocks.Length; i++) {
-            voxelBlocks[i] = Bin.RefreshConnectivity(voxelBlocks, i, dimensions);
+        for(int i = 0; i < originalVoxelBlocks.Length; i++) {
+            originalVoxelBlocks[i] = Bin.RefreshConnectivity(originalVoxelBlocks, i, dimensions);
         }
 
-        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, voxelsToDelete.ToQueue(), STEP_DURATION);
+        yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, STEP_DURATION);
 
         void ValidateResults(List<VoxelCluster> foundClusters) {
             Assert.AreEqual(1, foundClusters.Count);

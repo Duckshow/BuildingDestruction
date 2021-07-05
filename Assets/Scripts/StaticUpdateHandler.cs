@@ -1,3 +1,5 @@
+using UnityEngine;
+
 public class StaticUpdateHandler : Singleton<StaticUpdateHandler> {
 
     private Callback onLateUpdate;
