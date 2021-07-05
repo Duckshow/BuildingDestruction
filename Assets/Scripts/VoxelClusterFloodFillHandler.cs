@@ -50,10 +50,6 @@ public static class VoxelClusterFloodFillHandler {
         latestFindVoxelClustersProcess = new FloodFillSubject(voxelBlocks, offset, dimensions);
 #endif
 
-        if(dimensions == new Vector3Int(1, 3, 2)) {
-            Debug.Log("let's boogie");
-        }
-
         clusters.Clear();
         while(voxelBlocksToLookAt.Count > 0) {
             int startIndex = voxelBlocksToLookAt.Dequeue();
@@ -82,41 +78,42 @@ public static class VoxelClusterFloodFillHandler {
 
             while(voxelBlocksToVisit.Count > 0) {
                 int voxelBlockIndex = voxelBlocksToVisit.Dequeue();
-
                 if(visitedVoxelBlocks[voxelBlockIndex]) {
                     continue;
                 }
-
                 visitedVoxelBlocks[voxelBlockIndex] = true;
-                foundBins.Enqueue(voxelBlockIndex);
-
-#if UNITY_EDITOR
-                if(stepDuration > 0f && false) {
-                    Utils.DebugDrawVoxelCluster(voxelBlocks, offset, new Color(1f, 1f, 1f, 0.25f), stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => voxelBlock.IsExterior);
-                    
-                    foreach(var foundIndex in foundBins) {
-                        Utils.DebugDrawVoxelBlock(voxelBlocks[foundIndex], offset, clusterColor, stepDuration);
-                    }
-
-                    yield return new WaitForSeconds(stepDuration);
-                }
-
-                sequence.Enqueue(voxelBlockIndex);
-#endif
 
                 Bin voxelBlock = voxelBlocks[voxelBlockIndex];
+                
+                if(!voxelBlock.IsWalledIn()) {
+                    foundBins.Enqueue(voxelBlockIndex);
 
-                Vector3Int voxelBlockMinVoxelCoords = Bin.GetMinVoxelCoord(voxelBlock);
-                newVoxelOffset.x = Mathf.Min(newVoxelOffset.x, voxelBlock.Coords.x + voxelBlockMinVoxelCoords.x);
-                newVoxelOffset.y = Mathf.Min(newVoxelOffset.y, voxelBlock.Coords.y + voxelBlockMinVoxelCoords.y);
-                newVoxelOffset.z = Mathf.Min(newVoxelOffset.z, voxelBlock.Coords.z + voxelBlockMinVoxelCoords.z);
+                    Vector3Int voxelBlockMinVoxelCoords = Bin.GetMinVoxelCoord(voxelBlock);
+                    newVoxelOffset.x = Mathf.Min(newVoxelOffset.x, voxelBlock.Coords.x * Bin.WIDTH + voxelBlockMinVoxelCoords.x);
+                    newVoxelOffset.y = Mathf.Min(newVoxelOffset.y, voxelBlock.Coords.y * Bin.WIDTH + voxelBlockMinVoxelCoords.y);
+                    newVoxelOffset.z = Mathf.Min(newVoxelOffset.z, voxelBlock.Coords.z * Bin.WIDTH + voxelBlockMinVoxelCoords.z);
 
-                minCoord.x = Mathf.Min(minCoord.x, voxelBlock.Coords.x);
-                minCoord.y = Mathf.Min(minCoord.y, voxelBlock.Coords.y);
-                minCoord.z = Mathf.Min(minCoord.z, voxelBlock.Coords.z);
-                maxCoord.x = Mathf.Max(maxCoord.x, voxelBlock.Coords.x);
-                maxCoord.y = Mathf.Max(maxCoord.y, voxelBlock.Coords.y);
-                maxCoord.z = Mathf.Max(maxCoord.z, voxelBlock.Coords.z);
+                    minCoord.x = Mathf.Min(minCoord.x, voxelBlock.Coords.x);
+                    minCoord.y = Mathf.Min(minCoord.y, voxelBlock.Coords.y);
+                    minCoord.z = Mathf.Min(minCoord.z, voxelBlock.Coords.z);
+                    maxCoord.x = Mathf.Max(maxCoord.x, voxelBlock.Coords.x);
+                    maxCoord.y = Mathf.Max(maxCoord.y, voxelBlock.Coords.y);
+                    maxCoord.z = Mathf.Max(maxCoord.z, voxelBlock.Coords.z);
+
+#if UNITY_EDITOR
+                    if(stepDuration > 0f) {
+                        Utils.DebugDrawVoxelCluster(voxelBlocks, offset, new Color(1f, 1f, 1f, 0.25f), stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => voxelBlock.IsExterior);
+
+                        foreach(var foundIndex in foundBins) {
+                            Utils.DebugDrawVoxelBlock(voxelBlocks[foundIndex], offset, clusterColor, stepDuration);
+                        }
+
+                        yield return new WaitForSeconds(stepDuration);
+                    }
+
+                    sequence.Enqueue(voxelBlockIndex);
+#endif
+                }
 
                 TryAddNeighborToVisit(voxelBlocks, voxelBlock, dimensions, Direction.Right, voxelBlocksToVisit);
                 TryAddNeighborToVisit(voxelBlocks, voxelBlock, dimensions, Direction.Left, voxelBlocksToVisit);
@@ -236,7 +233,8 @@ public static class VoxelClusterFloodFillHandler {
 #if UNITY_EDITOR
                         if(stepDuration > 0f) {
                             Utils.DebugDrawVoxelCluster(voxelBlocks, clusterOffset, new Color(1f, 1f, 1f, 0.25f), stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => voxelBlock.IsInterior);
-                            Utils.DebugDrawVoxelCluster(voxelBlocks, clusterOffset, Color.green, stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => voxelBlock.IsExterior);
+                            Utils.DebugDrawVoxelCluster(voxelBlocks, clusterOffset, new Color(0f, 1f, 0f, 0.25f), stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => voxelBlock.IsExterior && !voxelBlock.IsForcedExterior);
+                            Utils.DebugDrawVoxelCluster(voxelBlocks, clusterOffset, new Color(0f, 1f, 0f, 1f), stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => voxelBlock.IsForcedExterior);
 
                             yield return new WaitForSeconds(stepDuration);
                         }

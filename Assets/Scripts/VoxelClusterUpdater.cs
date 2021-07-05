@@ -141,7 +141,7 @@ public static class VoxelClusterUpdater {
         }
 
         // 4. find clusters
-        yield return VoxelClusterFloodFillHandler.FindVoxelClusters(voxelBlocks, user.GetOffset(), dimensions, findClustersStartingPointQueue, stepDuration, onFinished: (List<VoxelCluster> foundClusters) => { 
+        yield return VoxelClusterFloodFillHandler.FindVoxelClusters(voxelBlocks, user.GetOffset(), dimensions, findClustersStartingPointQueue, stepDuration, onFinished: (List<VoxelCluster> foundClusters) => {
             user.OnUpdateFinish(foundClusters); 
         });
     }

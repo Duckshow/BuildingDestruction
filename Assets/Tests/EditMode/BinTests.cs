@@ -468,11 +468,11 @@ public class BinTests {
 
     [Test]
     public void TestGetMinVoxelCoords() {
-        Assert.AreEqual(new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue), Bin.GetMinVoxelCoord(new Bin(0, new Vector3Int(0, 0, 0), 0b_0000_0000)));
-        Assert.AreEqual(new Vector3Int(0, 0, 0), Bin.GetMinVoxelCoord(new Bin(0, Vector3Int.zero, 0b_1111_1111)));
-        Assert.AreEqual(new Vector3Int(1, 0, 0), Bin.GetMinVoxelCoord(new Bin(0, Vector3Int.zero, 0b_0000_0010)));
-        Assert.AreEqual(new Vector3Int(0, 1, 0), Bin.GetMinVoxelCoord(new Bin(0, Vector3Int.zero, 0b_0000_0100)));
-        Assert.AreEqual(new Vector3Int(0, 0, 1), Bin.GetMinVoxelCoord(new Bin(0, Vector3Int.zero, 0b_0001_0000)));
+        Assert.AreEqual(new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue),   Bin.GetMinVoxelCoord(new Bin(0, new Vector3Int(1, 1, 1), 0b_0000_0000)));
+        Assert.AreEqual(new Vector3Int(0,            0,            0),              Bin.GetMinVoxelCoord(new Bin(0, new Vector3Int(1, 1, 1), 0b_1111_1111)));
+        Assert.AreEqual(new Vector3Int(1,            0,            0),              Bin.GetMinVoxelCoord(new Bin(0, new Vector3Int(1, 1, 1), 0b_0000_0010)));
+        Assert.AreEqual(new Vector3Int(0,            1,            0),              Bin.GetMinVoxelCoord(new Bin(0, new Vector3Int(1, 1, 1), 0b_0000_0100)));
+        Assert.AreEqual(new Vector3Int(0,            0,            1),              Bin.GetMinVoxelCoord(new Bin(0, new Vector3Int(1, 1, 1), 0b_0001_0000)));
     }
 
     [Test]

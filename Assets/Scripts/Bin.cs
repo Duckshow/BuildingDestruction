@@ -39,8 +39,24 @@ public readonly struct Bin {
     internal readonly byte voxelNeighborsForeBack;
 
     public readonly bool IsExterior { get { return isForcedExterior || voxels > 0; } }
+
+#if UNITY_EDITOR
+    public readonly bool IsForcedExterior { get { return isForcedExterior; } }
+#endif
+
     public readonly bool IsInterior { get { return !IsExterior; } }
     private readonly bool isForcedExterior;
+
+#if UNITY_EDITOR
+    public bool Debug_HasVoxel_0 { get { return GetVoxelExists(0); } }
+    public bool Debug_HasVoxel_1 { get { return GetVoxelExists(1); } }
+    public bool Debug_HasVoxel_2 { get { return GetVoxelExists(2); } }
+    public bool Debug_HasVoxel_3 { get { return GetVoxelExists(3); } }
+    public bool Debug_HasVoxel_4 { get { return GetVoxelExists(4); } }
+    public bool Debug_HasVoxel_5 { get { return GetVoxelExists(5); } }
+    public bool Debug_HasVoxel_6 { get { return GetVoxelExists(6); } }
+    public bool Debug_HasVoxel_7 { get { return GetVoxelExists(7); } }
+#endif
 
     public Bin Clone() {
         return (Bin)MemberwiseClone();
@@ -278,10 +294,6 @@ public readonly struct Bin {
             return true;
         }
 
-        if(coords == Vector3Int.zero && dimensions.x == 1) {
-            Debug.Log("boogie boi");
-        }
-
         return RefreshConnectivity(voxelBlocks[index], voxelBlockRight, voxelBlockLeft, voxelBlockUp, voxelBlockDown, voxelBlockFore, voxelBlockBack);
     }
 
@@ -317,7 +329,7 @@ public readonly struct Bin {
                 bool b6 = Utils.GetValueFromByte(neighborBin.voxels, 6);
                 bool b7 = Utils.GetValueFromByte(neighborBin.voxels, 7); 
 
-                aercmamrecäame // something's going on here with refresh connectivity, although it may just be the DoubleSplitAlongZ-setup being wrong
+                //aercmamrecäame // something's going on here with refresh connectivity, although it may just be the DoubleSplitAlongZ-setup being wrong
 
                 Utils.SetValueInByte(ref axisVoxelNeighbors, bitOffset + i, hasVoxelNeighbor);
             }
