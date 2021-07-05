@@ -140,9 +140,9 @@ public partial class VoxelGrid : MonoBehaviour {
         Vector3 targetLocalPos = meshTransform.InverseTransformPoint(worldPos);
         
         return new Vector3Int(
-            Mathf.FloorToInt(targetLocalPos.x + 0.5f), 
-            Mathf.FloorToInt(targetLocalPos.y + 0.5f), 
-            Mathf.FloorToInt(targetLocalPos.z + 0.5f)
+            Mathf.FloorToInt(targetLocalPos.x), 
+            Mathf.FloorToInt(targetLocalPos.y), 
+            Mathf.FloorToInt(targetLocalPos.z)
         );
     }
 
