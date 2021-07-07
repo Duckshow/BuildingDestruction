@@ -27,7 +27,7 @@ public partial class VoxelGrid : MonoBehaviour {
             isStatic = true;
 
             // this just ensures that the initial building will be in the same spot as it was placed in the editor - a bit ugly, but I haven't figured out anything better yet
-            //meshTransform.localPosition = new Vector3(-(startDimensions.x * Bin.WIDTH) / 2f, 0f, -(startDimensions.z * Bin.WIDTH) / 2f);
+            meshTransform.localPosition = new Vector3(-(startDimensions.x * Bin.WIDTH) / 2f, 0f, -(startDimensions.z * Bin.WIDTH) / 2f);
 
             ApplyCluster(new VoxelCluster(dimensions: startDimensions, voxelBlockStartValue: byte.MaxValue));
         }
