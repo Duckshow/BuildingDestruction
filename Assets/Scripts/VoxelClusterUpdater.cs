@@ -16,11 +16,11 @@ public class VoxelClusterUpdater : Singleton<VoxelClusterUpdater> {
     }
 
     private void LateUpdate() {
-        //timer -= Time.deltaTime;
-        //if(timer > 0f) {
-        //    return;
-        //}
-        //timer = UPDATE_LATENCY;
+        timer -= Time.deltaTime;
+        if(timer > 0f) {
+            return;
+        }
+        timer = UPDATE_LATENCY;
 
         while(dirtyClusters.Count > 0) { // TODO: could probably multithread this
             IVoxelCluster cluster = dirtyClusters.Dequeue();
