@@ -146,12 +146,16 @@ public class VoxelCluster : IVoxelCluster {
 
 	private bool GetVoxelExists(int voxelIndex) {
 		Utils.GetVoxelBlockAndVoxelIndex(voxelIndex, Dimensions, out int voxelBlockIndex, out int localVoxelIndex);
-
 		Bin voxelBlock = voxelBlocks[voxelBlockIndex];
-		if(voxelBlock.IsWholeBinEmpty()) {
-			return false;
+
+        if(voxelBlock.IsExterior) {
+			if(voxelBlock.IsWholeBinEmpty()) {
+				return false;
+			}
+
+			return voxelBlock.GetVoxelExists(localVoxelIndex);
 		}
 
-		return voxelBlock.GetVoxelExists(localVoxelIndex);
+		return true;
 	}
 }
