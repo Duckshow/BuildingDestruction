@@ -29,12 +29,22 @@ public class VoxelController : MonoBehaviour {
 			}
         }
 
-        if(Input.GetMouseButton(0)) {
-			FireBeam(isInstant: true);
-        }
-        else if(Input.GetMouseButton(1)) {
-			FireBeam(isInstant: false);
-        }
+        if(Input.GetKey(KeyCode.LeftShift)) {
+			if(Input.GetMouseButton(0)) {
+				FireBeam(isInstant: true);
+			}
+			else if(Input.GetMouseButton(1)) {
+				FireBeam(isInstant: false);
+			}
+		}
+        else {
+			if(Input.GetMouseButtonDown(0)) {
+				FireBeam(isInstant: true);
+			}
+			else if(Input.GetMouseButtonDown(1)) {
+				FireBeam(isInstant: false);
+			}
+		}
 	}
 
 	private void FireBeam(bool isInstant) {
