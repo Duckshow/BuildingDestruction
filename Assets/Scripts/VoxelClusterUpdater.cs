@@ -16,13 +16,15 @@ public class VoxelClusterUpdater : Singleton<VoxelClusterUpdater> {
     }
 
     private void LateUpdate() {
-        timer -= Time.deltaTime;
-        if(timer > 0f) {
-            return;
-        }
-        timer = UPDATE_LATENCY;
+        //timer -= Time.deltaTime;
+        //if(timer > 0f) {
+        //    return;
+        //}
+        //timer = UPDATE_LATENCY;
 
-        foreach(var cluster in dirtyClusters) { // TODO: could probably multithread this
+        while(dirtyClusters.Count > 0) { // TODO: could probably multithread this
+            IVoxelCluster cluster = dirtyClusters.Dequeue();
+
             if(!cluster.IsDirty()) {
                 continue;
             }
@@ -41,12 +43,26 @@ public class VoxelClusterUpdater : Singleton<VoxelClusterUpdater> {
         Debug.Assert(voxelsToRemove.Count > 0);
 
         Vector3Int dimensions = cluster.GetDimensions();
-        Queue<int> generateInteriorsQueue = voxelsToRemove;
-		Queue<int> deleteExteriorsQueue = new Queue<int>(voxelsToRemove.Count);
-		Queue<int> refreshConnectivityQueue = new Queue<int>(voxelsToRemove.Count * 6 * 5); // 6 * 5 is a guesstimate of how many neighbors are affected when we get neighbors as well as their neighbors
-        Queue<int> findClustersStartingPointQueue = new Queue<int>(voxelsToRemove.Count);
+        bool[] visitedVoxels = new bool[(dimensions * Bin.WIDTH).Product()];
 
-        // 1. generate affected interior blocks
+        Queue<int> generateInteriorsQueue           = new Queue<int>(visitedVoxels.Length);
+		Queue<int> deleteExteriorsQueue             = new Queue<int>(visitedVoxels.Length);
+		Queue<int> refreshConnectivityQueue         = new Queue<int>(visitedVoxels.Length);
+        Queue<int> findClustersStartingPointQueue   = new Queue<int>(visitedVoxels.Length);
+
+        // 1. clear out duplicate indexes (optimize?)
+        while(voxelsToRemove.Count > 0) {
+            int voxelIndex = voxelsToRemove.Dequeue();
+
+            if(visitedVoxels[voxelIndex]) {
+                continue;
+            }
+            visitedVoxels[voxelIndex] = true;
+
+            generateInteriorsQueue.Enqueue(voxelIndex);
+        }
+
+        // 2. generate affected interior blocks
         while(generateInteriorsQueue.Count > 0) {
             int voxelIndex = generateInteriorsQueue.Dequeue();
 			deleteExteriorsQueue.Enqueue(voxelIndex);
@@ -91,7 +107,7 @@ public class VoxelClusterUpdater : Singleton<VoxelClusterUpdater> {
             }
 		}
 
-        // 2. delete requested voxels
+        // 3. delete requested voxels
         while(deleteExteriorsQueue.Count > 0) {
             int voxelIndex = deleteExteriorsQueue.Dequeue();
 
@@ -104,7 +120,7 @@ public class VoxelClusterUpdater : Singleton<VoxelClusterUpdater> {
             voxelBlocks[voxelBlockIndex] = voxelBlocks[voxelBlockIndex].SetVoxelExists(localVoxelIndex, exists: false);
         }
 
-        // 3. refresh affected voxelblocks' connectivity
+        // 4. refresh affected voxelblocks' connectivity
         bool[] voxelBlockRefreshedStates = new bool[voxelBlocks.Length];
         while(refreshConnectivityQueue.Count > 0) {
             int voxelBlockIndex = refreshConnectivityQueue.Dequeue();
@@ -122,7 +138,7 @@ public class VoxelClusterUpdater : Singleton<VoxelClusterUpdater> {
             voxelBlockRefreshedStates[voxelBlockIndex] = true;
         }
 
-        // 4. find clusters
+        // 5. find clusters
         yield return VoxelClusterFloodFillHandler.FindVoxelClusters(voxelBlocks, cluster.GetOffset(), dimensions, findClustersStartingPointQueue, stepDuration, onFinished: (List<VoxelCluster> foundClusters) => {
             cluster.OnUpdateFinish(foundClusters);
         });

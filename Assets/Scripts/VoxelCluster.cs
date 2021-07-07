@@ -3,16 +3,18 @@ using System.Runtime.CompilerServices;
 using System.Collections.Generic;
 
 [assembly: InternalsVisibleTo("PlayMode")]
+[System.Serializable]
 public class VoxelCluster : IVoxelCluster {
+
+	private IVoxelCluster.State state = IVoxelCluster.State.Idle;
 
 	public Vector3Int VoxelOffset { get; private set; }
 	public Vector3Int Dimensions { get; private set; }
 	public Vector3Int VoxelDimensions { get { return Dimensions * Bin.WIDTH; } }
 
+	private VoxelGrid owner;
 	private Bin[] voxelBlocks;
 	private Queue<int> voxelsToBeRemoved = new Queue<int>();
-	private Callback<List<VoxelCluster>> onFinishedUpdate;
-	private bool isWaitingForUpdate;
 
 	public VoxelCluster Clone() {
 		VoxelCluster clone = (VoxelCluster)MemberwiseClone();
@@ -55,11 +57,27 @@ public class VoxelCluster : IVoxelCluster {
 		Dimensions = dimensions;
 	}
 
-	public void RemoveVoxel(Vector3Int voxelCoords) {
-		RemoveVoxel(Utils.CoordsToIndex(voxelCoords, VoxelDimensions));
+	public VoxelGrid GetOwner() {
+		return owner;
 	}
 
-	public void RemoveVoxel(int voxelIndex) {
+	public void SetOwner(VoxelGrid owner) {
+		this.owner = owner;
+	}
+
+	public void TryRemoveVoxel(Vector3Int voxelCoords) {
+		TryRemoveVoxel(Utils.CoordsToIndex(voxelCoords, VoxelDimensions));
+	}
+
+	public void TryRemoveVoxel(int voxelIndex) {
+        if(state == IVoxelCluster.State.WaitingForUpdate) {
+			return;
+        }
+
+        if(!GetVoxelExists(voxelIndex)) {
+			return;
+        }
+
 		voxelsToBeRemoved.Enqueue(voxelIndex);
 
 		if(voxelsToBeRemoved.Count == 1) {
@@ -68,7 +86,8 @@ public class VoxelCluster : IVoxelCluster {
 	}
 
 	public void OnUpdateStart(out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) {
-		isWaitingForUpdate = true;
+		state = IVoxelCluster.State.WaitingForUpdate;
+
 		voxelBlocks = this.voxelBlocks;
 		voxelsToRemove = voxelsToBeRemoved;
 	}
@@ -77,20 +96,19 @@ public class VoxelCluster : IVoxelCluster {
 		return voxelsToBeRemoved.Count > 0;
 	}
 
-	public bool IsWaitingForUpdate() {
-		return isWaitingForUpdate;
-	}
-
 	public void OnUpdateFinish(List<VoxelCluster> newClusters) {
-		isWaitingForUpdate = false;
-		if(onFinishedUpdate != null) {
-			onFinishedUpdate(newClusters);
-        }
+		Debug.Assert(voxelsToBeRemoved.Count == 0);
+
+		state = IVoxelCluster.State.Idle;
+
+        if(owner != null) {
+			Debug.Assert(ReferenceEquals(this, owner.GetVoxelCluster()));
+			owner.OnClusterFinishedUpdate(newClusters);
+		}
 	}
 
-	public void SubscribeToOnFinishedUpdate(Callback<List<VoxelCluster>> subscriber) {
-		Debug.Assert(onFinishedUpdate == null);
-		onFinishedUpdate = subscriber;
+	public IVoxelCluster.State GetCurrentState() {
+		return state;
 	}
 
 	public Vector3Int GetOffset() {
@@ -111,7 +129,7 @@ public class VoxelCluster : IVoxelCluster {
 	}
 
 	public bool TryGetVoxelBlock(int index, out Bin voxelBlock) {
-		if(IsDirty() || isWaitingForUpdate) {
+		if(state == IVoxelCluster.State.WaitingForUpdate || IsDirty()) { // not sure if IsDirty() is actually needed here - it's a bit confusing as well
 			Debug.LogError("Tried to get VoxelBlock, but is currently awaiting update!");
 			voxelBlock = new Bin();
 			return false;
@@ -126,23 +144,14 @@ public class VoxelCluster : IVoxelCluster {
 		return true;
 	}
 
-    public bool GetVoxelExists(Vector3Int voxelCoords) {
-        return GetVoxelExists(voxelCoords, this);
-    }
+	private bool GetVoxelExists(int voxelIndex) {
+		Utils.GetVoxelBlockAndVoxelIndex(voxelIndex, Dimensions, out int voxelBlockIndex, out int localVoxelIndex);
 
-    internal static bool GetVoxelExists(Vector3Int voxelCoords, VoxelCluster voxelCluster) {
-        int voxelBlockIndex, localVoxelIndex;
-		Utils.GetVoxelBlockAndVoxelIndex(voxelCoords, voxelCluster.Dimensions, out voxelBlockIndex, out localVoxelIndex);
+		Bin voxelBlock = voxelBlocks[voxelBlockIndex];
+		if(voxelBlock.IsWholeBinEmpty()) {
+			return false;
+		}
 
-		Bin voxelBlock = voxelCluster.voxelBlocks[voxelBlockIndex];
-        if(voxelBlock.IsWholeBinEmpty()) {
-            return false;
-        }
-
-        return voxelBlock.GetVoxelExists(localVoxelIndex);
-    }
-
-	public bool ShouldBeStatic(bool wasOriginallyStatic) {
-		return wasOriginallyStatic && VoxelOffset.y == 0;
+		return voxelBlock.GetVoxelExists(localVoxelIndex);
 	}
 }

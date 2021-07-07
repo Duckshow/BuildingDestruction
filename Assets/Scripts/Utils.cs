@@ -372,6 +372,10 @@ public static partial class Utils
         return value % 2 == 0 ? value : value + 1;
     }
 
+    public static int RoundDownToEven(int value) {
+        return value % 2 == 0 ? value : value - 1;
+    }
+
     public static int RoundDownToOdd(int value) {
         return value % 2 == 0 ? value - 1 : value;
     }

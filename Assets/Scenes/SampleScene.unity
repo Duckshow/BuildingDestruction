@@ -561,7 +561,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startDimensions: {x: 4, y: 8, z: 5}
   meshTransform: {fileID: 703501606}
-  isOriginal: 1
+  isFirstStart: 1
 --- !u!1 &2064405285
 GameObject:
   m_ObjectHideFlags: 1

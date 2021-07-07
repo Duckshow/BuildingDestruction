@@ -7,12 +7,12 @@ public partial class VoxelGrid : MonoBehaviour {
 
     [SerializeField] private Vector3Int startDimensions;
     [SerializeField] private Transform meshTransform;
-    [SerializeField, HideInInspector] private bool isOriginal = true; // TODO: this should be removed once we have a more permanent way of saving and loading buildings
+    [SerializeField, HideInInspector] private bool isFirstStart = true; // TODO: this should be removed once we have a more permanent way of saving and loading buildings
 
     private VoxelBuilder voxelBuilder;
     private new Rigidbody rigidbody;
 
-    private VoxelCluster voxels;
+    private VoxelCluster voxelCluster;
     
     private bool isStatic;
 
@@ -22,9 +22,11 @@ public partial class VoxelGrid : MonoBehaviour {
     }
 
     private void Start() {
-        if(isOriginal) {
+        if(isFirstStart) {
+            isFirstStart = false;
+
             // this just ensures that the initial building will be in the same spot as it was placed in the editor - a bit ugly, but I haven't figured out anything better yet
-            meshTransform.localPosition = new Vector3(-(startDimensions.x * Bin.WIDTH) / 2f, 0f, -(startDimensions.z * Bin.WIDTH) / 2f);
+            //meshTransform.localPosition = new Vector3(-(startDimensions.x * Bin.WIDTH) / 2f, 0f, -(startDimensions.z * Bin.WIDTH) / 2f);
 
             ApplyCluster(new VoxelCluster(dimensions: startDimensions, voxelBlockStartValue: byte.MaxValue));
         }
@@ -48,14 +50,11 @@ public partial class VoxelGrid : MonoBehaviour {
             originalMeshObjects[i].parent = null;
         }
 
-        for(int i = 1; i < clusterCount; i++) {
+        for(int i = 0; i < clusterCount - 1; i++) {
             GameObject go = Instantiate(gameObject, transform.parent);
             go.name = transform.name + " (Cluster)";
-
-            VoxelGrid newVoxelGrid = go.GetComponent<VoxelGrid>();
-            newVoxelGrid.MarkAsCopy();
-
-            newVoxelGrids[i] = newVoxelGrid;
+            
+            newVoxelGrids[i] = go.GetComponent<VoxelGrid>();
         }
 
         for(int i = 1; i < originalMeshObjects.Length; i++) {
@@ -65,33 +64,40 @@ public partial class VoxelGrid : MonoBehaviour {
         return newVoxelGrids;
     }
 
-    public void ApplyCluster(VoxelCluster voxelCluster) {
-        isStatic = isOriginal ? true : voxelCluster.ShouldBeStatic(isStatic);
+    public void ApplyCluster(VoxelCluster newVoxelCluster) {
+        isStatic = isStatic && newVoxelCluster.VoxelOffset.y == 0;
 
-        Vector3 GetLocalPosWithWorldRotation(Vector3 localPos, Transform t) {
-            return (t.TransformPoint(localPos) - t.position);
-        }
+        ApplyNewPivot(transform, meshTransform, newVoxelCluster, isStatic);
 
-        Vector3 newMeshTransformPos = meshTransform.position + GetLocalPosWithWorldRotation(voxelCluster.VoxelOffset, meshTransform);
-        Vector3 pivot = GetPivot(voxelCluster, isStatic);
-
-        transform.position = meshTransform.position + GetLocalPosWithWorldRotation(pivot, meshTransform);
-        meshTransform.position = newMeshTransformPos;
-
-        voxels = voxelCluster;
-        voxels.SubscribeToOnFinishedUpdate(OnClusterFinishedUpdate);
+        voxelCluster = newVoxelCluster;
+        voxelCluster.SetOwner(this);
 
         voxelBuilder.Refresh();
     }
 
-    private void OnClusterFinishedUpdate(List<VoxelCluster> newClusters) {
+    internal static void ApplyNewPivot(Transform pivotTransform, Transform meshTransform, VoxelCluster cluster, bool isStatic) {
+        Vector3 meshTransformOffset = new Vector3(Utils.RoundDownToEven(cluster.VoxelOffset.x), Utils.RoundDownToEven(cluster.VoxelOffset.y), Utils.RoundDownToEven(cluster.VoxelOffset.z));
+
+        Vector3 newMeshTransformPos = meshTransform.position + GetLocalPosWithWorldRotation(meshTransformOffset, meshTransform);
+        Vector3 pivot = GetPivot(cluster, isStatic);
+
+        pivotTransform.position = newMeshTransformPos + GetLocalPosWithWorldRotation(pivot, meshTransform);
+        meshTransform.position = newMeshTransformPos;
+
+        Vector3 GetLocalPosWithWorldRotation(Vector3 localPos, Transform t) {
+            return (t.TransformPoint(localPos) - t.position);
+        }
+    }
+
+    public void OnClusterFinishedUpdate(List<VoxelCluster> newClusters) {
+
         if(newClusters.Count == 1) {
             ApplyCluster(newClusters[0]);
             return;
         }
 
         VoxelGrid[] splitVoxelGrids = CreateMoreVoxelGridsForNewClusters(newClusters.Count);
-
+       
         Debug.Assert(splitVoxelGrids.Length + 1 == newClusters.Count);
 
         int biggestClusterIndex = GetBiggestVoxelClusterIndex(newClusters);
@@ -107,10 +113,6 @@ public partial class VoxelGrid : MonoBehaviour {
         }
 
         ApplyCluster(newClusters[biggestClusterIndex]);
-    }
-
-    public void MarkAsCopy() {
-        isOriginal = false;
     }
 
     public bool IsStatic() {
@@ -148,7 +150,7 @@ public partial class VoxelGrid : MonoBehaviour {
 
     internal static Vector3 GetPivot(VoxelCluster voxelCluster, bool isStatic) {
         Vector3 pivot = Vector3.zero;
-        Vector3Int divisors = Vector3Int.zero;
+        float divisor = 0f;
 
         for(int voxelBlockIndex = 0; voxelBlockIndex < voxelCluster.GetVoxelBlockCount(); voxelBlockIndex++) {
             if(!voxelCluster.TryGetVoxelBlock(voxelBlockIndex, out Bin voxelBlock)) {
@@ -160,7 +162,7 @@ public partial class VoxelGrid : MonoBehaviour {
             }
 
             if(voxelBlock.IsInterior || voxelBlock.IsWholeBinFilled()) {
-                TryAddToPivot(voxelBlock.Coords * Bin.WIDTH + Vector3Int.one, isStatic, ref pivot, ref divisors);
+                AddToPivot(voxelBlock.Coords * Bin.WIDTH + new Vector3(0.5f, 0.5f, 0.5f), ref pivot, ref divisor);
                 continue;
             }
 
@@ -169,38 +171,22 @@ public partial class VoxelGrid : MonoBehaviour {
                     continue;
                 }
 
-                TryAddToPivot(Bin.GetVoxelGlobalCoords(voxelBlockIndex, localVoxelIndex, voxelCluster.Dimensions), isStatic, ref pivot, ref divisors);
+                Vector3 coords = Bin.GetVoxelGlobalCoords(voxelBlockIndex, localVoxelIndex, voxelCluster.Dimensions);
+                if(isStatic && coords.y > 0) {
+                    continue;
+                }
+
+                AddToPivot(coords, ref pivot, ref divisor);
             }
         }
 
-        static void TryAddToPivot(Vector3 coords, bool isStatic, ref Vector3 pivot, ref Vector3Int divisors) {
-            if(isStatic && coords.y > Bin.WIDTH - 1) {
-                return;
-            }
-
-            if(coords.x > 0) { 
-                pivot.x += coords.x;
-                ++divisors.x;
-            }
-            if(coords.y > 0) { 
-                pivot.y += coords.y;
-                ++divisors.y;
-            }
-            if(coords.z > 0) { 
-                pivot.z += coords.z;
-                ++divisors.z;
-            }
+        static void AddToPivot(Vector3 coords, ref Vector3 pivot, ref float divisor) {
+            pivot = new Vector3(pivot.x + coords.x, pivot.y + coords.y, pivot.z + coords.z);
+            ++divisor;
         }
 
-        if(divisors.x > 0) {
-            pivot.x /= divisors.x;
-        }
-        if(divisors.y > 0) {
-            pivot.y /= divisors.y;
-        }
-        if(divisors.z > 0) {
-            pivot.z /= divisors.z;
-        }
+        pivot /= divisor;
+        pivot = new Vector3(pivot.x + 0.5f, pivot.y + 0.5f, pivot.z + 0.5f);
 
         if(isStatic) {
             pivot.y = 0f;
@@ -210,6 +196,10 @@ public partial class VoxelGrid : MonoBehaviour {
     }
 
     public VoxelCluster GetVoxelCluster() {
-        return voxels;
+        return voxelCluster;
+    }
+
+    public VoxelBuilder GetVoxelBuilder() {
+        return voxelBuilder;
     }
 }

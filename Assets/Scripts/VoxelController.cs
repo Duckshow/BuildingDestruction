@@ -12,9 +12,6 @@ public class VoxelController : MonoBehaviour {
 		if(voxelGrid == null) {
 			return;
 		}
-        if(voxelGrid.GetVoxelCluster().IsWaitingForUpdate()) {
-			return;
-        }
 
         if(Input.GetKeyDown(KeyCode.Space)) {
 			Vector3Int voxelGridDimensions = voxelGrid.GetVoxelCluster().VoxelDimensions;
@@ -26,7 +23,7 @@ public class VoxelController : MonoBehaviour {
 							continue;
                         }
 
-						voxelGrid.GetVoxelCluster().RemoveVoxel(new Vector3Int(x, y, z));
+						voxelGrid.GetVoxelCluster().TryRemoveVoxel(new Vector3Int(x, y, z));
 					}
 				}
 			}
@@ -54,7 +51,7 @@ public class VoxelController : MonoBehaviour {
 				continue;
             }
 
-			voxelGrid.GetVoxelCluster().RemoveVoxel(lineVoxelCoords);
+			voxelGrid.GetVoxelCluster().TryRemoveVoxel(lineVoxelCoords);
             if(!isInstant) {
 				break;
             }

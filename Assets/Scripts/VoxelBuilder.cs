@@ -18,6 +18,8 @@ public class VoxelBuilder {
 	}
 
     public void Refresh() {
+		Debug.Assert(ReferenceEquals(this, owner.GetVoxelBuilder()));
+
 		Vector3Int newDimensions = owner.GetVoxelCluster().Dimensions;
 
 		if(dimensions == Vector3Int.zero) {

@@ -8,7 +8,7 @@ using Assert = NUnit.Framework.Assert;
 
 public class VoxelClusterIntegrationTests {
 
-    private const float STEP_DURATION = 0.025f;
+    private const float STEP_DURATION = 0f;
 
     [UnityTest]
     public IEnumerator TestSplitAlongZ() {
@@ -504,6 +504,192 @@ public class VoxelClusterIntegrationTests {
     }
 
     [UnityTest]
+    public IEnumerator TestCutCorner() {
+        const int WIDTH = 4;
+        const int HEIGHT = 8;
+        const int DEPTH = 5;
+
+        FauxVoxelCluster user;
+        VoxelCluster mainCluster = null;
+
+        VoxelCluster originalCluster = new VoxelCluster(new Vector3Int(WIDTH, HEIGHT, DEPTH), voxelBlockStartValue: byte.MaxValue);
+        Vector3Int dimensions = new Vector3Int(WIDTH, HEIGHT, DEPTH);
+        
+        Bin[] voxelBlocks = TestUtils.GetNewVoxelBlockGrid(WIDTH, HEIGHT, DEPTH, byte.MaxValue);
+        for(int i = 0; i < voxelBlocks.Length; i++) {
+            voxelBlocks[i] = Bin.RefreshConnectivity(voxelBlocks, i, dimensions);
+        }
+
+        List<int> deletedVoxels = new List<int>();
+
+        {
+            int[] voxelsToDelete = new int[] {
+                // =========== z == 0 ===========
+                Utils.GetVoxelIndex(31, 2, dimensions),
+                Utils.GetVoxelIndex(31, 6, dimensions),
+
+                // =========== z == 1 ===========
+                Utils.GetVoxelIndex(63, 2, dimensions),
+                Utils.GetVoxelIndex(63, 6, dimensions),
+
+                // =========== z == 2 ===========
+                Utils.GetVoxelIndex(95, 2, dimensions),
+                Utils.GetVoxelIndex(95, 6, dimensions),
+
+                // =========== z == 3 ===========
+                Utils.GetVoxelIndex(127, 2, dimensions),
+                Utils.GetVoxelIndex(127, 6, dimensions),
+
+                // =========== z == 4 ===========
+                Utils.GetVoxelIndex(159, 2, dimensions),
+                Utils.GetVoxelIndex(159, 6, dimensions),
+            };
+
+            deletedVoxels.AddRange(voxelsToDelete);
+
+            user = new FauxVoxelCluster(
+                offset: Vector3Int.zero,
+                dimensions: new Vector3Int(WIDTH, HEIGHT, DEPTH),
+                onUpdateStart: (out Bin[] vBlocks, out Queue<int> voxelsToRemove) => {
+                    vBlocks = voxelBlocks;
+                    voxelsToRemove = voxelsToDelete.ToQueue();
+                },
+                onUpdateFinish: ValidateResults
+            );
+
+            yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, STEP_DURATION);
+
+            void ValidateResults(List<VoxelCluster> foundClusters) {
+                Assert.AreEqual(1, foundClusters.Count);
+
+                AssertClusterLooksCorrect(
+                    foundClusters[0],
+                    expectedOffset: new Vector3Int(0, 0, 0),
+                    expectedDimensions: new Vector3Int(WIDTH, HEIGHT, DEPTH),
+                    shouldVoxelBlockBeExterior: (Vector3Int coords) => { return Utils.AreCoordsOnTheEdge(coords, dimensions); },
+                    shouldExteriorVoxelExist: (Vector3Int coords) => { return !deletedVoxels.Contains(Utils.CoordsToIndex(coords, dimensions * Bin.WIDTH)); }
+                );
+                
+                mainCluster = foundClusters[0];
+            }
+        }
+
+        {
+            int[] voxelsToDelete = new int[] {
+                // =========== z == 0 ===========
+                Utils.GetVoxelIndex(31, 0, dimensions),
+                Utils.GetVoxelIndex(31, 4, dimensions),
+
+                // =========== z == 1 ===========
+                Utils.GetVoxelIndex(63, 0, dimensions),
+                Utils.GetVoxelIndex(63, 4, dimensions),
+
+                // =========== z == 2 ===========
+                Utils.GetVoxelIndex(95, 0, dimensions),
+                Utils.GetVoxelIndex(95, 4, dimensions),
+
+                // =========== z == 3 ===========
+                Utils.GetVoxelIndex(127, 0, dimensions),
+                Utils.GetVoxelIndex(127, 4, dimensions),
+
+                // =========== z == 4 ===========
+                Utils.GetVoxelIndex(159, 0, dimensions),
+                Utils.GetVoxelIndex(159, 4, dimensions),
+            };
+
+            deletedVoxels.AddRange(voxelsToDelete);
+
+            user = new FauxVoxelCluster(
+                offset: mainCluster.VoxelOffset,
+                dimensions: mainCluster.Dimensions,
+                onUpdateStart: (out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) => {
+                    voxelBlocks = GetClusterVoxelBlocksAsArray(mainCluster);
+                    voxelsToRemove = voxelsToDelete.ToQueue();
+                },
+                onUpdateFinish: ValidateResults
+            );
+
+            yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, STEP_DURATION);
+
+            void ValidateResults(List<VoxelCluster> foundClusters) {
+                Assert.AreEqual(1, foundClusters.Count);
+
+                AssertClusterLooksCorrect(
+                    foundClusters[0],
+                    expectedOffset: new Vector3Int(0, 0, 0),
+                    expectedDimensions: new Vector3Int(WIDTH, HEIGHT, DEPTH),
+                    shouldVoxelBlockBeExterior: (Vector3Int coords) => { return Utils.AreCoordsOnTheEdge(coords, dimensions); },
+                    shouldExteriorVoxelExist: (Vector3Int coords) => { return !deletedVoxels.Contains(Utils.CoordsToIndex(coords, dimensions * Bin.WIDTH)); }
+                );
+
+                mainCluster = foundClusters[0];
+            }
+        }
+
+        {
+            int[] voxelsToDelete = new int[] {
+                // =========== z == 0 ===========
+                Utils.GetVoxelIndex(31, 1, dimensions),
+                Utils.GetVoxelIndex(31, 5, dimensions),
+
+                // =========== z == 1 ===========
+                Utils.GetVoxelIndex(63, 1, dimensions),
+                Utils.GetVoxelIndex(63, 5, dimensions),
+
+                // =========== z == 2 ===========
+                Utils.GetVoxelIndex(95, 1, dimensions),
+                Utils.GetVoxelIndex(95, 5, dimensions),
+
+                // =========== z == 3 ===========
+                Utils.GetVoxelIndex(127, 1, dimensions),
+                Utils.GetVoxelIndex(127, 5, dimensions),
+
+                // =========== z == 4 ===========
+                Utils.GetVoxelIndex(159, 1, dimensions),
+                Utils.GetVoxelIndex(159, 5, dimensions),
+            };
+
+            deletedVoxels.AddRange(voxelsToDelete);
+
+            user = new FauxVoxelCluster(
+                offset: mainCluster.VoxelOffset,
+                dimensions: mainCluster.Dimensions,
+                onUpdateStart: (out Bin[] voxelBlocks, out Queue<int> voxelsToRemove) => {
+                    voxelBlocks = GetClusterVoxelBlocksAsArray(mainCluster);
+                    voxelsToRemove = voxelsToDelete.ToQueue();
+                },
+                onUpdateFinish: ValidateResults
+            );
+
+            yield return VoxelClusterUpdater.RemoveVoxelsInCluster(user, STEP_DURATION);
+
+            void ValidateResults(List<VoxelCluster> foundClusters) {
+                Assert.AreEqual(2, foundClusters.Count);
+
+                if(foundClusters[0].VoxelOffset.y > foundClusters[1].VoxelOffset.y) {
+                    foundClusters.Reverse();
+                }
+
+                AssertClusterLooksCorrect(
+                    foundClusters[0],
+                    expectedOffset: new Vector3Int(0, 0, 0),
+                    expectedDimensions: new Vector3Int(WIDTH, HEIGHT, DEPTH),
+                    shouldVoxelBlockBeExterior: (Vector3Int coords) => { return Utils.AreCoordsOnTheEdge(coords, dimensions); },
+                    shouldExteriorVoxelExist: (Vector3Int coords) => { return coords.x < 6 || coords.y < 14; }
+                );
+
+                AssertClusterLooksCorrect(
+                    foundClusters[1],
+                    expectedOffset: new Vector3Int(7, 15, 0),
+                    expectedDimensions: new Vector3Int(1, 1, DEPTH),
+                    shouldVoxelBlockBeExterior: (Vector3Int coords) => { return true; },
+                    shouldExteriorVoxelExist: (Vector3Int coords) => { return coords.x == 1 && coords.y == 1; }
+                );
+            }
+        }
+    }
+
+    [UnityTest]
     public IEnumerator TestRefreshExterior() {
         const int WIDTH = 5;
         const int HEIGHT = 6;
@@ -719,7 +905,8 @@ public class VoxelClusterIntegrationTests {
                     Assert.AreEqual(shouldVoxelBlockBeExterior(voxelBlockCoords), voxelBlock.IsExterior);
 
                     if(voxelBlock.IsExterior) {
-                        Assert.AreEqual(shouldExteriorVoxelExist(voxelCoords), doesVoxelExist, "Voxel at {0} is {1}, but should be {2}!", voxelCoords, doesVoxelExist, shouldExteriorVoxelExist(voxelCoords));
+                        bool shouldExist = shouldExteriorVoxelExist(voxelCoords);
+                        Assert.AreEqual(shouldExist, doesVoxelExist, "Voxel at {0}/{1} is {2}, but should be {3}!", voxelCoords, Utils.CoordsToIndex(voxelCoords, cluster.VoxelDimensions), doesVoxelExist, shouldExist);
                     }
                     else {
                         Assert.AreEqual(false, doesVoxelExist);

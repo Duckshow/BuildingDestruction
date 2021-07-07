@@ -31,11 +31,11 @@ public class FauxVoxelCluster : IVoxelCluster {
         onUpdateFinish(newClusters);
     }
 
-    public bool IsWaitingForUpdate() {
-        return false;
-    }
-
     public bool IsDirty() {
         return true;
+    }
+
+    public IVoxelCluster.State GetCurrentState() {
+        return IVoxelCluster.State.Idle;
     }
 }
