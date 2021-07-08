@@ -24,33 +24,10 @@ public static class VoxelClusterFloodFillHandler {
     private static Queue<int> foundBins = new Queue<int>();
     private static Queue<MoveOrder> moveOrders = new Queue<MoveOrder>();
 
-#if UNITY_EDITOR
-    private class FloodFillSubject {
-        public Bin[] OriginalVoxelBlocks;
-        public Vector3Int OriginalOffset;
-        public Vector3Int OriginalDimensions;
-        public Queue<Queue<int>> FloodFillSequences;
-
-        public FloodFillSubject(Bin[] originalVoxelBlocks, Vector3Int originalOffset, Vector3Int originalDimensions) {
-            OriginalVoxelBlocks = originalVoxelBlocks;
-            OriginalOffset = originalOffset;
-            OriginalDimensions = originalDimensions;
-            FloodFillSequences = new Queue<Queue<int>>();
-        }
-    }
-
-    private static FloodFillSubject latestFindVoxelClustersProcess;
-    private static FloodFillSubject latestFindExteriorBlocksProcess;
-#endif
-
     public static IEnumerator FindVoxelClusters(Bin[] voxelBlocks, Vector3Int offset, Vector3Int dimensions, Queue<int> voxelBlocksToLookAt, float stepDuration, Callback<List<VoxelCluster>> onFinished) {
         Debug.Assert(voxelBlocksToLookAt.Count > 0);
         
         bool[] visitedVoxelBlocks = new bool[voxelBlocks.Length];
-
-#if UNITY_EDITOR
-        latestFindVoxelClustersProcess = new FloodFillSubject(voxelBlocks, offset, dimensions);
-#endif
 
         clusters.Clear();
         while(voxelBlocksToLookAt.Count > 0) {
@@ -125,10 +102,6 @@ public static class VoxelClusterFloodFillHandler {
                 TryAddNeighborToVisit(voxelBlocks, voxelBlock, dimensions, Direction.Back, voxelBlocksToVisit);
 
                 static void TryAddNeighborToVisit(Bin[] voxelBlocks, Bin origin, Vector3Int dimensions, Direction direction, Queue<int> voxelBlocksToVisit) {
-                    if(!origin.IsConnectedToNeighbor(direction)) {
-                        return;
-                    }
-
                     Vector3Int dirVec = Utils.DirectionToVector(direction);
                     Vector3Int neighborCoords = new Vector3Int(origin.Coords.x + dirVec.x, origin.Coords.y + dirVec.y, origin.Coords.z + dirVec.z);
 
@@ -147,13 +120,13 @@ public static class VoxelClusterFloodFillHandler {
                         return;
                     }
 
+                    if(!origin.IsConnectedToNeighbor(direction)) {
+                        return;
+                    }
+
                     voxelBlocksToVisit.Enqueue(neighborIndex);
                 }
             }
-
-#if UNITY_EDITOR
-            latestFindVoxelClustersProcess.FloodFillSequences.Enqueue(sequence);
-#endif
 
             if(foundBins.Count == 0) {
                 continue;
@@ -202,20 +175,12 @@ public static class VoxelClusterFloodFillHandler {
 
         bool[] visitedExteriorBins = new bool[voxelBlocks.Length];
 
-#if UNITY_EDITOR
-        latestFindExteriorBlocksProcess = new FloodFillSubject(voxelBlocks, clusterOffset, clusterDimensions);
-#endif
-
         for(int z = 0; z < clusterDimensions.z; z++) {
             for(int y = 0; y < clusterDimensions.y; y++) {
                 for(int x = 0; x < clusterDimensions.x; x++) {
                     if(x > 0 && x < clusterDimensions.x - 1 && y > 0 && y < clusterDimensions.y - 1 && z > 0 && z < clusterDimensions.z - 1) {
                         continue;
                     }
-
-#if UNITY_EDITOR
-                    Queue<int> sequence = new Queue<int>();
-#endif 
 
                     moveOrders.Clear();
                     moveOrders.Enqueue(new MoveOrder(Utils.CoordsToIndex(new Vector3Int(x, y, z), clusterDimensions), Direction.None));
@@ -244,8 +209,6 @@ public static class VoxelClusterFloodFillHandler {
 
                             yield return new WaitForSeconds(stepDuration);
                         }
-
-                        sequence.Enqueue(currentBlockIndex);
 #endif
 
                         visitedExteriorBins[currentBlockIndex] = true;
@@ -290,48 +253,8 @@ public static class VoxelClusterFloodFillHandler {
                             return true;
                         }
                     }
-
-#if UNITY_EDITOR
-                    latestFindExteriorBlocksProcess.FloodFillSequences.Enqueue(sequence);
-#endif
                 }
             }
         }
     }
-
-#if UNITY_EDITOR
-    public static IEnumerator ReplayAndClearLatestFindVoxelClustersProcess(float stepDuration) {
-        yield return ReplayProcess(latestFindVoxelClustersProcess, stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => { return true; });
-
-        latestFindVoxelClustersProcess = null;
-    }
-
-    public static IEnumerator ReplayAndClearLatestFindExteriorBlocksProcess(float stepDuration) {
-        yield return ReplayProcess(latestFindExteriorBlocksProcess, stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => { return voxelBlock.IsExterior; });
-        
-        latestFindExteriorBlocksProcess = null;
-    }
-
-    private static IEnumerator ReplayProcess(FloodFillSubject subject, float stepDuration, Predicate<Bin> shouldDrawVoxelBlock) {
-        while(subject.FloodFillSequences.Count > 0) {
-            Queue<int> sequence = subject.FloodFillSequences.Dequeue();
-
-            Utils.DebugDrawVoxelCluster(subject.OriginalVoxelBlocks, subject.OriginalOffset, new Color(1f, 1f, 1f, 0.5f), stepDuration * sequence.Count, shouldDrawVoxelBlock: (Bin voxelBlock) => { return !voxelBlock.IsWalledIn(); });
-
-            Color clusterColor = Random.ColorHSV(0f, 1f, 1f, 1f, 1f, 1f);
-            
-            while(sequence.Count > 0) {
-                int voxelBlockIndex = sequence.Dequeue();
-
-                Bin voxelBlock = subject.OriginalVoxelBlocks[voxelBlockIndex];
-                if(!shouldDrawVoxelBlock(voxelBlock)) {
-                    continue;
-                }
-
-                Utils.DebugDrawVoxelBlock(voxelBlock, subject.OriginalOffset, clusterColor, stepDuration * (sequence.Count + 1));
-                yield return new WaitForSeconds(stepDuration);
-            }
-        }
-    }
-#endif
 }
