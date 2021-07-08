@@ -187,14 +187,17 @@ public readonly struct Bin {
             return false;
         }
         
-        byte cachedNeighbors = GetCachedVoxelNeighbors(direction, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
-
         byte voxelsOnFace = 0;
         for(int i = 0; i < VOXELS_PER_FACE; i++) {
             TryGetLocalVoxelIndex(i, direction, out int localVoxelIndex);
             Utils.SetValueInByte(ref voxelsOnFace, i, Utils.GetValueFromByte(voxels, localVoxelIndex));
         }
 
+        if(voxelsOnFace == 0) {
+            return false;
+        }
+
+        byte cachedNeighbors = GetCachedVoxelNeighbors(direction, voxelNeighborsRightLeft, voxelNeighborsUpDown, voxelNeighborsForeBack);
         return (cachedNeighbors & voxelsOnFace) > 0;
     }
 
@@ -319,18 +322,7 @@ public readonly struct Bin {
             for(byte i = 0; i < VOXELS_PER_FACE; i++) {
                 TryGetLocalVoxelIndex(i, neighborFace, out int localVoxelIndex);
                 bool hasVoxelNeighbor = (neighborBin.voxels >> localVoxelIndex & 1) == 1;
-
-                bool b0 = Utils.GetValueFromByte(neighborBin.voxels, 0);
-                bool b1 = Utils.GetValueFromByte(neighborBin.voxels, 1);
-                bool b2 = Utils.GetValueFromByte(neighborBin.voxels, 2);
-                bool b3 = Utils.GetValueFromByte(neighborBin.voxels, 3);
-                bool b4 = Utils.GetValueFromByte(neighborBin.voxels, 4);
-                bool b5 = Utils.GetValueFromByte(neighborBin.voxels, 5);
-                bool b6 = Utils.GetValueFromByte(neighborBin.voxels, 6);
-                bool b7 = Utils.GetValueFromByte(neighborBin.voxels, 7); 
-
-                //aercmamrecäame // something's going on here with refresh connectivity, although it may just be the DoubleSplitAlongZ-setup being wrong
-
+                
                 Utils.SetValueInByte(ref axisVoxelNeighbors, bitOffset + i, hasVoxelNeighbor);
             }
         }
