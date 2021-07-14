@@ -3,11 +3,93 @@ using System.Collections.Generic;
 using System.Collections;
 using System;
 using UnityEngine;
+using Unity.Collections;
+using Unity.Jobs;
+using Unity.Burst;
 
 using Random = UnityEngine.Random;
 
 [assembly: InternalsVisibleTo("PlayMode")]
 public static class VoxelClusterFloodFillHandler {
+    [BurstCompile]
+    private struct FloodFillJob : IJobParallelFor {
+
+        [ReadOnly] public NativeArray<Bin> VoxelBlocks;
+        [ReadOnly] public Vector3Int Dimensions;
+
+        public NativeArray<int> Targets;
+        public NativeArray<bool> FoundTargets;
+        
+        [NativeDisableParallelForRestriction] 
+        public NativeArray<bool> VisitedTargets;
+
+        [NativeDisableParallelForRestriction] 
+        public NativeArray<int> NextTargets;
+        
+        [NativeDisableParallelForRestriction] 
+        public NativeArray<int> NextTargetsAbove;
+        
+        [NativeDisableParallelForRestriction] 
+        public NativeArray<int> NextTargetsBelow;
+
+        public NativeArray<int> NextTargetsCount;
+        public NativeArray<int> NextTargetsAboveCount;
+        public NativeArray<int> NextTargetsBelowCount;
+
+        public void Execute(int level) {
+            int voxelBlockIndex = Targets[level];
+            if(VisitedTargets[voxelBlockIndex]) {
+                return;
+            }
+            VisitedTargets[voxelBlockIndex] = true;
+
+            Bin voxelBlock = VoxelBlocks[voxelBlockIndex];
+            if(!voxelBlock.IsWalledIn()) {
+                FoundTargets[level] = true;
+            }
+
+            for(int i = 0; i < 6; i++) {
+                Direction dir = (Direction)i;
+
+                Vector3Int dirVec = Utils.DirectionToVector(dir);
+                Vector3Int neighborCoords = new Vector3Int(voxelBlock.Coords.x + dirVec.x, voxelBlock.Coords.y + dirVec.y, voxelBlock.Coords.z + dirVec.z);
+
+                int nextTargetIndex = Utils.CoordsToIndex(neighborCoords, Dimensions);
+                if(nextTargetIndex == -1) {
+                    continue;
+                }
+
+                Bin neighbor = VoxelBlocks[nextTargetIndex];
+                if(neighbor.IsWholeBinEmpty()) {
+                    continue;
+                }
+
+                if(voxelBlock.IsWalledIn() && neighbor.IsWalledIn()) {
+                    continue;
+                }
+
+                if(!voxelBlock.IsConnectedToNeighbor(dir)) {
+                    continue;
+                }
+
+                if(dir == Direction.Up) {
+                    int index = level * 6 + NextTargetsAboveCount[level];
+                    NextTargetsAbove[index] = nextTargetIndex;
+                    NextTargetsAboveCount[level]++;
+                }
+                else if(dir == Direction.Down) {
+                    int index = level * 6 + NextTargetsBelowCount[level];
+                    NextTargetsBelow[index] = nextTargetIndex;
+                    NextTargetsBelowCount[level]++;
+                }
+                else {
+                    int index = level * 6 + NextTargetsCount[level];
+                    NextTargets[index] = nextTargetIndex;
+                    NextTargetsCount[level]++;
+                }
+            }
+        }
+    }
 
     private struct MoveOrder {
         public int TargetIndex;
@@ -20,8 +102,6 @@ public static class VoxelClusterFloodFillHandler {
     }
 
     private static List<VoxelCluster> clusters = new List<VoxelCluster>();
-    private static Queue<int> voxelBlocksToVisit = new Queue<int>();
-    private static Queue<int> foundBins = new Queue<int>();
     private static Queue<MoveOrder> moveOrders = new Queue<MoveOrder>();
 
     public static IEnumerator FindVoxelClusters(Bin[] voxelBlocks, Vector3Int offset, Vector3Int dimensions, Queue<int> voxelBlocksToLookAt, float stepDuration, Callback<List<VoxelCluster>> onFinished) {
@@ -32,7 +112,6 @@ public static class VoxelClusterFloodFillHandler {
         clusters.Clear();
         while(voxelBlocksToLookAt.Count > 0) {
             int startIndex = voxelBlocksToLookAt.Dequeue();
-
             if(startIndex < 0) {
                 continue;
             }
@@ -42,98 +121,133 @@ public static class VoxelClusterFloodFillHandler {
                 continue;
             }
 
-            foundBins.Clear();
-            voxelBlocksToVisit.Clear();
-            voxelBlocksToVisit.Enqueue(startIndex);
-
             Vector3Int newVoxelOffset = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
             Vector3Int minCoord = new Vector3Int(int.MaxValue, int.MaxValue, int.MaxValue);
             Vector3Int maxCoord = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
 
 #if UNITY_EDITOR
             Color clusterColor = Random.ColorHSV(0f, 1f, 1f, 1f, 1f, 1f);
-            Queue<int> sequence = new Queue<int>();
 #endif
 
-            while(voxelBlocksToVisit.Count > 0) {
-                int voxelBlockIndex = voxelBlocksToVisit.Dequeue();
-                if(visitedVoxelBlocks[voxelBlockIndex]) {
-                    continue;
-                }
-                visitedVoxelBlocks[voxelBlockIndex] = true;
+            Queue<int> foundVoxelBlocks = new Queue<int>();
 
-                Bin voxelBlock = voxelBlocks[voxelBlockIndex];
+            NativeArray<Bin> nativeVoxelBlocks  = new NativeArray<Bin>(voxelBlocks, Allocator.TempJob);
+            NativeArray<int> targets            = new NativeArray<int>(dimensions.y, Allocator.TempJob);
+            NativeArray<bool> foundTargets      = new NativeArray<bool>(dimensions.y, Allocator.TempJob);
+            NativeArray<bool> visitedTargets    = new NativeArray<bool>(dimensions.Product(), Allocator.TempJob);
+
+            NativeArray<int> nextTargets            = new NativeArray<int>(dimensions.y * 6, Allocator.TempJob);
+            NativeArray<int> nextTargetsAbove       = new NativeArray<int>(dimensions.y * 6, Allocator.TempJob);
+            NativeArray<int> nextTargetsBelow       = new NativeArray<int>(dimensions.y * 6, Allocator.TempJob);
+            NativeArray<int> nextTargetsCount       = new NativeArray<int>(dimensions.y, Allocator.TempJob);
+            NativeArray<int> nextTargetsAboveCount  = new NativeArray<int>(dimensions.y, Allocator.TempJob);
+            NativeArray<int> nextTargetsBelowCount  = new NativeArray<int>(dimensions.y, Allocator.TempJob);
+
+            FloodFillJob floodFillJob           = new FloodFillJob();
+            floodFillJob.VoxelBlocks            = nativeVoxelBlocks;
+            floodFillJob.Dimensions             = dimensions;
+            floodFillJob.FoundTargets           = foundTargets;
+            floodFillJob.VisitedTargets         = visitedTargets;
+            floodFillJob.NextTargets            = nextTargets;
+            floodFillJob.NextTargetsCount       = nextTargetsCount;
+            floodFillJob.NextTargetsAbove       = nextTargetsAbove;
+            floodFillJob.NextTargetsAboveCount  = nextTargetsAboveCount;
+            floodFillJob.NextTargetsBelow       = nextTargetsBelow;
+            floodFillJob.NextTargetsBelowCount  = nextTargetsBelowCount;
+
+            targets[startVoxelBlock.Coords.y] = startVoxelBlock.Index;
+            
+            while(true) {
+                floodFillJob.Targets = targets;
+
+                JobHandle handle = floodFillJob.Schedule(dimensions.y, 1);
+                handle.Complete();
+
+                bool foundNewTargets = false;
                 
-                if(!voxelBlock.IsWalledIn()) {
-                    foundBins.Enqueue(voxelBlockIndex);
+                for(int y = 0; y < dimensions.y; y++) {
+                    if(foundTargets[y]) {
+                        foundVoxelBlocks.Enqueue(targets[y]);
 
-                    Vector3Int voxelBlockMinVoxelCoords = Bin.GetMinVoxelCoord(voxelBlock);
-                    newVoxelOffset.x = Mathf.Min(newVoxelOffset.x, voxelBlock.Coords.x * Bin.WIDTH + voxelBlockMinVoxelCoords.x);
-                    newVoxelOffset.y = Mathf.Min(newVoxelOffset.y, voxelBlock.Coords.y * Bin.WIDTH + voxelBlockMinVoxelCoords.y);
-                    newVoxelOffset.z = Mathf.Min(newVoxelOffset.z, voxelBlock.Coords.z * Bin.WIDTH + voxelBlockMinVoxelCoords.z);
+                        Vector3Int foundTargetCoords = Utils.IndexToCoords(targets[y], dimensions);
+                        minCoord.x = Mathf.Min(minCoord.x, foundTargetCoords.x);
+                        minCoord.y = Mathf.Min(minCoord.y, foundTargetCoords.y);
+                        minCoord.z = Mathf.Min(minCoord.z, foundTargetCoords.z);
+                        maxCoord.x = Mathf.Max(maxCoord.x, foundTargetCoords.x);
+                        maxCoord.y = Mathf.Max(maxCoord.y, foundTargetCoords.y);
+                        maxCoord.z = Mathf.Max(maxCoord.z, foundTargetCoords.z);
 
-                    minCoord.x = Mathf.Min(minCoord.x, voxelBlock.Coords.x);
-                    minCoord.y = Mathf.Min(minCoord.y, voxelBlock.Coords.y);
-                    minCoord.z = Mathf.Min(minCoord.z, voxelBlock.Coords.z);
-                    maxCoord.x = Mathf.Max(maxCoord.x, voxelBlock.Coords.x);
-                    maxCoord.y = Mathf.Max(maxCoord.y, voxelBlock.Coords.y);
-                    maxCoord.z = Mathf.Max(maxCoord.z, voxelBlock.Coords.z);
+                        foundTargets[y] = false;
+                    }
+                    
+                    if(y > 0) {
+                        for(int i = 0; i < nextTargetsAboveCount[y - 1]; i++) {
+                            int index      = GetIndexInTargetArray(x: nextTargetsCount[y] - 1, y);
+                            int indexBelow = GetIndexInTargetArray(x: nextTargetsAboveCount[y - 1] - 1, y - 1);
+
+                            nextTargets[index] = nextTargetsAbove[indexBelow];
+                            nextTargetsCount[y]++;
+                            nextTargetsAboveCount[indexBelow]--;
+                        }
+                    }
+
+                    if(y < dimensions.y - 1) {
+                        for(int i = 0; i < nextTargetsBelowCount[y + 1]; i++) {
+                            int index      = GetIndexInTargetArray(x: nextTargetsCount[y] - 1, y);
+                            int indexAbove = GetIndexInTargetArray(x: nextTargetsBelowCount[y + 1] - 1, y + 1);
+
+                            nextTargets[index] = nextTargetsBelow[indexAbove];
+                            nextTargetsCount[y]++;
+                            nextTargetsBelowCount[indexAbove]--;
+                        }
+                    }
+
+                    if(nextTargetsCount[y] == 0) {
+                        continue;
+                    }
+
+                    targets[y] = nextTargets[GetIndexInTargetArray(x: nextTargetsCount[y] - 1, y)];
+                    nextTargetsCount[y]--;
+                    foundNewTargets = true;
+
+                    static int GetIndexInTargetArray(int x, int y) {
+                        return y * 6 + x;
+                    }
+                }
+
+                if(!foundNewTargets) {
+                    break;
+                }
 
 #if UNITY_EDITOR
-                    if(stepDuration > 0f) {
-                        Utils.DebugDrawVoxelCluster(voxelBlocks, offset, new Color(1f, 1f, 1f, 0.25f), stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => voxelBlock.IsExterior);
+                if(stepDuration > 0f) {
+                    Utils.DebugDrawVoxelCluster(voxelBlocks, offset, new Color(1f, 1f, 1f, 0.25f), stepDuration, shouldDrawVoxelBlock: (Bin voxelBlock) => voxelBlock.IsExterior);
 
-                        foreach(var foundIndex in foundBins) {
-                            Utils.DebugDrawVoxelBlock(voxelBlocks[foundIndex], offset, clusterColor, stepDuration);
-                        }
-
+                    foreach(var foundIndex in foundVoxelBlocks) {
+                        Utils.DebugDrawVoxelBlock(voxelBlocks[foundIndex], offset, clusterColor, stepDuration);
                         yield return new WaitForSeconds(stepDuration);
                     }
-
-                    sequence.Enqueue(voxelBlockIndex);
+                }
 #endif
-                }
-
-                TryAddNeighborToVisit(voxelBlocks, voxelBlock, dimensions, Direction.Right, voxelBlocksToVisit);
-                TryAddNeighborToVisit(voxelBlocks, voxelBlock, dimensions, Direction.Left, voxelBlocksToVisit);
-                TryAddNeighborToVisit(voxelBlocks, voxelBlock, dimensions, Direction.Up, voxelBlocksToVisit);
-                TryAddNeighborToVisit(voxelBlocks, voxelBlock, dimensions, Direction.Down, voxelBlocksToVisit);
-                TryAddNeighborToVisit(voxelBlocks, voxelBlock, dimensions, Direction.Fore, voxelBlocksToVisit);
-                TryAddNeighborToVisit(voxelBlocks, voxelBlock, dimensions, Direction.Back, voxelBlocksToVisit);
-
-                static void TryAddNeighborToVisit(Bin[] voxelBlocks, Bin origin, Vector3Int dimensions, Direction direction, Queue<int> voxelBlocksToVisit) {
-                    Vector3Int dirVec = Utils.DirectionToVector(direction);
-                    Vector3Int neighborCoords = new Vector3Int(origin.Coords.x + dirVec.x, origin.Coords.y + dirVec.y, origin.Coords.z + dirVec.z);
-
-                    int neighborIndex = Utils.CoordsToIndex(neighborCoords, dimensions);
-                    if(neighborIndex == -1) {
-                        return;
-                    }
-
-                    Bin neighbor = voxelBlocks[neighborIndex];
-
-                    if(neighbor.IsWholeBinEmpty()) {
-                        return;
-                    }
-
-                    if(origin.IsWalledIn() && neighbor.IsWalledIn()) {
-                        return;
-                    }
-
-                    if(!origin.IsConnectedToNeighbor(direction)) {
-                        return;
-                    }
-
-                    voxelBlocksToVisit.Enqueue(neighborIndex);
-                }
             }
 
-            if(foundBins.Count == 0) {
+            nativeVoxelBlocks.Dispose();
+            targets.Dispose();
+            foundTargets.Dispose();
+            visitedTargets.Dispose();
+            nextTargets.Dispose();
+            nextTargetsAbove.Dispose();
+            nextTargetsBelow.Dispose();
+            nextTargetsCount.Dispose();
+            nextTargetsAboveCount.Dispose();
+            nextTargetsBelowCount.Dispose();
+
+            if(foundVoxelBlocks.Count == 0) {
                 continue;
             }
 
             Vector3Int newDimensions;
-            Bin[] newVoxelBlocks = MoveBlocksAndTranslateData(voxelBlocks, dimensions, foundBins, minCoord, maxCoord, out newDimensions);
+            Bin[] newVoxelBlocks = MoveBlocksAndTranslateData(voxelBlocks, dimensions, foundVoxelBlocks, minCoord, maxCoord, out newDimensions);
 
             yield return FindExteriorBlocksAroundCluster(newVoxelBlocks, newVoxelOffset, newDimensions, stepDuration);
 
@@ -151,7 +265,7 @@ public static class VoxelClusterFloodFillHandler {
 
     internal static Bin[] MoveBlocksAndTranslateData(Bin[] voxelBlocks, Vector3Int dimensions, Queue<int> indexesToMove, Vector3Int minCoord, Vector3Int maxCoord, out Vector3Int newBinGridDimensions) {
         newBinGridDimensions = maxCoord - minCoord + Vector3Int.one;
-        Bin[] newVoxelBlocks = new Bin[newBinGridDimensions.x * newBinGridDimensions.y * newBinGridDimensions.z];
+        Bin[] newVoxelBlocks = new Bin[newBinGridDimensions.Product()];
 
         for(int i = 0; i < newVoxelBlocks.Length; i++) {
             newVoxelBlocks[i] = new Bin(i, newBinGridDimensions, byte.MinValue);
@@ -161,7 +275,6 @@ public static class VoxelClusterFloodFillHandler {
             int oldIndex = indexesToMove.Dequeue();
             Vector3Int oldBinCoords = Utils.IndexToCoords(oldIndex, dimensions);
             int newIndex = Utils.CoordsToIndex(oldBinCoords - minCoord, newBinGridDimensions);
-
             newVoxelBlocks[newIndex] = new Bin(voxelBlocks[oldIndex], newIndex, newBinGridDimensions);
         }
 
