@@ -559,7 +559,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 204eb92615733c540984645b74bde563, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  startDimensions: {x: 16, y: 32, z: 16}
+  startDimensions: {x: 4, y: 8, z: 5}
   meshTransform: {fileID: 703501606}
   isFirstStart: 1
 --- !u!1 &2064405285
